@@ -1,6 +1,6 @@
 -- =============================================================
 -- Migration 001 — Initial app schema for hanging-line dashboard
--- Target DB: hanging_data_new (SQL Server, Windows Auth)
+-- Target DB: current dashboard database (SQL Server, Windows Auth)
 -- Idempotent: safe to re-run; uses IF NOT EXISTS guards.
 -- =============================================================
 
