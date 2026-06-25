@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block content %}
+<nav class="glass-nav">
+  <div class="nav-inner">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">Hanging Conveyor · MES</span>
+    </div>
+    <div class="filters">
+      <label class="field">
+        <span class="field-label">Từ</span>
+        <input type="date" id="filter-from"
+               min="{{ min_date }}" max="{{ max_date }}"
+               value="{{ default_from }}" />
+      </label>
+      <label class="field">
+        <span class="field-label">Đến</span>
+        <input type="date" id="filter-to"
+               min="{{ min_date }}" max="{{ max_date }}"
+               value="{{ default_to }}" />
+      </label>
+      <label class="field">
+        <span class="field-label">Tổ</span>
+        <select id="filter-line">
+          <option value="">Tất cả</option>
+        </select>
+      </label>
+      <label class="field">
+        <span class="field-label">Kế hoạch</span>
+        <select id="filter-plan">
+          <option value="">Tất cả</option>
+        </select>
+      </label>
+      <button class="btn btn-primary" id="btn-apply">Áp dụng</button>
+    </div>
+    <div class="filters">
+      {% if user %}
+      <a href="{{ '/admin' if (user.Role or '')|lower == 'admin' else '/entry' }}" class="btn btn-soft">Portal</a>
+      {% else %}
+      <a href="/login" class="btn btn-soft">Đăng nhập</a>
+      {% endif %}
+      <a href="/tv" class="btn btn-soft">TV setup</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="hero-inner">
+    <p class="eyebrow">Báo cáo sản xuất</p>
+    <h1 class="display">Bảng điều khiển<br/>chuyền treo.</h1>
+    <p class="lede">
+      Dữ liệu khớp với cột <em>OutputQty</em> của App Jensoft —
+      lọc tại trạm KCS (<code>StRole = 13</code>) ở công đoạn cuối (<code>IsLastSeq = 1</code>).
+    </p>
+    <p class="meta" id="range-meta"></p>
+  </div>
+</header>
+
+<section class="kpi-strip">
+  <div class="kpi-card">
+    <span class="kpi-label">Hàng ra chuyền</span>
+    <span class="kpi-value" id="kpi-output">—</span>
+    <span class="kpi-unit">sản phẩm</span>
+  </div>
+  <div class="kpi-card">
+    <span class="kpi-label">Sản phẩm lỗi</span>
+    <span class="kpi-value" id="kpi-defect">—</span>
+    <span class="kpi-unit" id="kpi-defect-rate"></span>
+  </div>
+  <div class="kpi-card">
+    <span class="kpi-label">Tổ hoạt động</span>
+    <span class="kpi-value" id="kpi-lines">—</span>
+    <span class="kpi-unit">tổ vật lý</span>
+  </div>
+  <div class="kpi-card">
+    <span class="kpi-label">Kế hoạch chạy</span>
+    <span class="kpi-value" id="kpi-plans">—</span>
+    <span class="kpi-unit">MO</span>
+  </div>
+  <div class="kpi-card">
+    <span class="kpi-label">Công nhân</span>
+    <span class="kpi-value" id="kpi-workers">—</span>
+    <span class="kpi-unit">đầu việc</span>
+  </div>
+</section>
+
+<section class="grid-2">
+  <article class="panel panel-wide">
+    <header class="panel-head">
+      <h2>Sản lượng theo ngày</h2>
+      <p class="panel-sub">Tách theo tổ — đường tích lũy phản ánh nhịp giao hàng</p>
+    </header>
+    <div class="chart-wrap">
+      <canvas id="chart-daily"></canvas>
+    </div>
+  </article>
+
+  <article class="panel">
+    <header class="panel-head">
+      <h2>Phân bố theo tổ</h2>
+      <p class="panel-sub">Tổng OutputQty trong khoảng đã chọn</p>
+    </header>
+    <div class="chart-wrap chart-wrap-sm">
+      <canvas id="chart-by-line"></canvas>
+    </div>
+  </article>
+</section>
+
+<section class="panel panel-full">
+  <header class="panel-head">
+    <h2>Throughput theo khung giờ</h2>
+    <p class="panel-sub">5 khung ca làm: 7:30–9:30, 9:30–11:30, 12:30–14:30, 14:30–16:30, Sau 16:30</p>
+  </header>
+  <div class="chart-wrap chart-wrap-lg">
+    <canvas id="chart-hourly"></canvas>
+  </div>
+</section>
+
+<section class="panel panel-full">
+  <header class="panel-head split">
+    <div>
+      <h2>Chi tiết theo kế hoạch</h2>
+      <p class="panel-sub">Plan × Tổ × Màu × Cỡ — khớp file Excel <code>6x to y.xlsx</code></p>
+    </div>
+    <input type="search" id="plan-search" class="search" placeholder="Lọc MO, Color, Size..." />
+  </header>
+  <div class="table-wrap">
+    <table class="table" id="table-plan">
+      <thead>
+        <tr>
+          <th>Ngày</th>
+          <th>Kế hoạch (MO)</th>
+          <th>Mã KH</th>
+          <th>Style</th>
+          <th>PO</th>
+          <th>Màu</th>
+          <th>Cỡ</th>
+          <th>Tổ</th>
+          <th class="num">SL ra chuyền</th>
+          <th class="num">Lỗi</th>
+          <th class="num">% lỗi</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel panel-full">
+  <header class="panel-head split">
+    <div>
+      <h2>Năng suất công nhân theo Số trạm</h2>
+      <p class="panel-sub">Sản lượng = MAX(QtyPerSeq) — không nhân số mã công đoạn</p>
+    </div>
+    <input type="search" id="worker-search" class="search" placeholder="Lọc tên, mã CN, trạm..." />
+  </header>
+  <div class="table-wrap">
+    <table class="table" id="table-workers">
+      <thead>
+        <tr>
+          <th>Ngày</th>
+          <th>Tổ</th>
+          <th>Số trạm</th>
+          <th>Mã CN</th>
+          <th>Tên CN</th>
+          <th>MO</th>
+          <th>Màu / Cỡ</th>
+          <th class="num">Số mã CĐ</th>
+          <th class="num">SL</th>
+          <th class="num">Lỗi</th>
+          <th class="num">Phút thực</th>
+          <th class="num">Hiệu suất</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<footer class="page-footer">
+  <p>Hanging Conveyor Dashboard · DB: <code>hanging_data_new</code></p>
+  <p class="muted"><span id="health-dot"></span> <span id="health-text">đang kiểm tra kết nối…</span></p>
+</footer>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/app.js?v=20260605d"></script>
+{% endblock %}

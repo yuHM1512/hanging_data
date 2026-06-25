@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>TV-3 · Chất lượng cuối chuyền & Máy hỏng</title>
+<link rel="stylesheet" href="/static/css/tv/shared.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Header overrides — đồng bộ TV-1/2 */
+  .hdr-line .lk { font-size: 12px; letter-spacing: .12em; opacity: .75; font-weight: 600; }
+  .hdr-line .lv { font-size: 44px; }
+  .hdr-line .style { font-size: 15px; margin-top: 3px; }
+  .fld .k { font-size: 12px; letter-spacing: .05em; color: rgba(255,255,255,.7); font-weight: 600; }
+  .fld .v { font-size: 26px; }
+  .fld .v.demand { font-size: 22px; color: #DDE7F8; }
+  .hdr-clock .date { font-size: 14px; color: rgba(255,255,255,.78); font-weight: 500; }
+  .hdr-fields { gap: var(--s-5); }
+
+  .body { flex: 1; min-height: 0; display: grid; grid-template-rows: auto 1fr; gap: var(--s-5); }
+
+  /* ── KPI row ─────────────────────────────────────── */
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s-5); }
+  .kp { display: flex; flex-direction: column; padding: var(--s-4) var(--s-5); gap: var(--s-2); }
+  .kp .k-head { display: flex; flex-direction: column; gap: 1px; }
+  .kp .k-k { font-size: var(--fs-label); font-weight: 700; color: var(--brand-ink); line-height: 1.15; }
+  .kp .k-en { font-size: var(--fs-micro); color: var(--ink-3); }
+  .kp .k-mid { flex: 1; display: flex; align-items: center; gap: var(--s-4); }
+  .kp .k-big { font-family: var(--font-mono); font-weight: 700; font-size: 52px; line-height: .9; }
+  .kp .k-chip { align-self: center; }
+  .c-pass { color: var(--pass-ink); }
+  .c-fail { color: var(--fail-ink); }
+  .pct-chip { font-size: var(--fs-micro); font-weight: 700; padding: 4px 10px; border-radius: var(--r-pill); text-transform: uppercase; letter-spacing: .04em; }
+  .fill-pass { background: var(--pass-soft); color: var(--pass-ink); }
+  .fill-fail { background: var(--fail-soft); color: var(--fail-ink); }
+
+  /* ── Main ────────────────────────────────────────── */
+  .main { display: grid; grid-template-columns: 7fr 5fr; gap: var(--s-5); min-height: 0; }
+  .qcard, .bcard { display: flex; flex-direction: column; min-height: 0; }
+  .q-body { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 360px; min-height: 0; }
+  .q-foot { display: flex; gap: var(--s-10); padding: var(--s-4) var(--s-6); border-top: 1px solid var(--divider); background: var(--surface-2); }
+  .q-foot .qf { display: flex; flex-direction: column; gap: 3px; }
+  .q-foot .qf .l { font-size: var(--fs-micro); color: var(--ink-3); text-transform: uppercase; letter-spacing: .04em; }
+  .q-foot .qf .v { font-family: var(--font-mono); font-weight: 700; font-size: 22px; color: var(--ink); }
+  .q-foot .qf .v.pass { color: var(--pass-ink); }
+  .q-foot .qf .v.fail { color: var(--fail-ink); }
+
+  /* Defect table */
+  .dwrap { display: flex; flex-direction: column; min-height: 0; }
+  .dtbl { width: 100%; border-collapse: collapse; }
+  .dtbl th { background: var(--brand-700); color: #fff; padding: var(--s-3) var(--s-3); font-size: var(--fs-label); font-weight: 600; text-align: center; }
+  .dtbl th .en { display: block; font-weight: 400; font-size: 10px; opacity: .8; margin-top: 1px; }
+  .dtbl td { padding: var(--s-4) var(--s-3); border-bottom: 1px solid var(--divider); font-size: var(--fs-body); text-align: center; vertical-align: middle; }
+  .dtbl td.code { font-family: var(--font-mono); font-weight: 700; text-align: left; color: var(--fail-ink); padding-left: var(--s-5); vertical-align: middle; line-height: 1.3; }
+  .dtbl td.code .ct { display: inline-block; font-size: 11px; color: var(--ink-3); margin-top: 4px; letter-spacing: .04em; text-transform: uppercase; font-weight: 600; }
+  .dtbl td.qty { background: var(--fail-solid); color: #fff; font-family: var(--font-mono); font-weight: 700; font-size: 26px; }
+  .dtbl tr.grp-start td { border-top: 2px solid var(--brand-700); }
+  .dtbl tr.grp-mid td.code { border-top: none; }
+  .dtbl td.cap { font-size: 14px; color: var(--ink-2); text-align: left; line-height: 1.32; max-width: 240px; }
+
+  /* Top defects mini chart */
+  .top3 { border-left: 1px solid var(--divider); padding: var(--s-4) var(--s-5); display: flex; flex-direction: column; min-height: 0; }
+  .top3-t { text-align: center; font-size: var(--fs-label); font-weight: 700; color: var(--brand-ink); text-transform: uppercase; letter-spacing: .04em; margin-bottom: var(--s-4); }
+  .mbars { flex: 1; display: flex; align-items: flex-end; justify-content: space-evenly; gap: var(--s-5); padding: 0 var(--s-2) var(--s-3); }
+  .mbw { width: 92px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: var(--s-3); align-self: stretch; }
+  .mbar { width: 100%; min-height: 28px; border-radius: 10px 10px 0 0; display: flex; justify-content: center; padding-top: var(--s-3); color: #fff; font-family: var(--font-mono); font-weight: 700; font-size: 26px; box-shadow: var(--sh-2); }
+  .mbar.tone-red { background: linear-gradient(180deg, #E05252, #C53939); }
+  .mbar.tone-yellow { background: linear-gradient(180deg, #F4C84E, #D8A929); color: #6B4300; }
+  .mbar.tone-orange { background: linear-gradient(180deg, #F39B45, #EA7C22); }
+  .mbl { font-size: 18px; text-align: center; color: var(--ink-2); font-weight: 800; line-height: 1; font-family: var(--font-mono); min-height: 20px; }
+
+  /* Breakdown panel */
+  .empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-4); padding: var(--s-8); text-align: center; }
+  .empty-ic { width: 110px; height: 110px; border-radius: 50%; background: var(--pass-soft); border: 3px solid var(--pass-solid); color: var(--pass-ink); display: flex; align-items: center; justify-content: center; font-size: 58px; font-weight: 700; }
+  .empty-t { color: var(--pass-ink); font-size: 26px; font-weight: 700; }
+  .empty-s { color: var(--ink-3); font-size: var(--fs-body); }
+  .blist { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .brow { display: grid; grid-template-columns: 1fr auto; gap: var(--s-3); padding: var(--s-3) var(--s-5); border-bottom: 1px solid var(--divider); }
+  .brow:nth-child(odd) { background: var(--surface-2); }
+  .brow .m-name { font-weight: 700; color: var(--ink); font-size: var(--fs-body); }
+  .brow .m-reason { font-size: var(--fs-label); color: var(--ink-2); margin-top: 2px; line-height: 1.35; }
+  .brow .m-min { font-family: var(--font-mono); font-weight: 700; font-size: 22px; color: var(--fail-ink); align-self: center; }
+  .b-foot { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--divider); }
+  .b-cell { padding: var(--s-4) var(--s-5); text-align: center; }
+  .b-cell + .b-cell { border-left: 1px solid var(--divider); }
+  .b-cell .l { font-size: var(--fs-micro); color: var(--ink-3); text-transform: uppercase; letter-spacing: .04em; }
+  .b-cell .v { font-family: var(--font-mono); font-weight: 700; font-size: 30px; color: var(--pass-ink); margin-top: 3px; }
+  .b-cell .v.warn { color: var(--fail-ink); }
+</style>
+</head>
+<body class="tv">
+<div class="stage-wrap">
+<div class="stage" id="stage">
+<div class="stage-inner">
+
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="hdr-line">
+      <span class="lk">Tổ</span>
+      <span class="lv" id="h-line">—</span>
+      <span class="style">Style <span id="h-style">—</span> · <span id="h-workers">—</span> LĐ</span>
+    </div>
+    <div class="hdr-div"></div>
+    <div class="hdr-fields">
+      <div class="fld"><span class="k">Số đơn hàng</span><span class="v demand mono" id="h-demand">—</span></div>
+      <div class="fld"><span class="k">K.Hàng / Customer</span><span class="v" id="h-customer">—</span></div>
+      <div class="fld"><span class="k">Rải chuyền / First day</span><span class="v mono" id="h-firstday">—</span></div>
+      <div class="fld"><span class="k">Lao động / Workers</span><span class="v mono" id="h-workers2">—</span></div>
+      <div class="fld"><span class="k">Hàng tồn / WIP</span><span class="v mono" id="h-wip">—</span></div>
+    </div>
+    <div class="hdr-clock">
+      <span class="date" id="h-date">—</span>
+      <span class="time" id="clock">—</span>
+    </div>
+  </div>
+
+  <!-- BODY -->
+  <div class="body">
+
+    <!-- KPI row -->
+    <div class="kpis">
+      <div class="card kp">
+        <div class="k-head"><div class="k-k">Tỉ lệ kiểm lại đạt</div><div class="k-en">Re-inspect pass rate (cumulative day)</div></div>
+        <div class="k-mid"><span class="k-big" id="kpi-reinspect-num">—</span><span class="k-chip pct-chip" id="kpi-reinspect-chip">—</span></div>
+      </div>
+      <div class="card kp">
+        <div class="k-head"><div class="k-k">Lỗi mốc hiện tại</div><div class="k-en" id="kpi-slot-en">Defects in current slot</div></div>
+        <div class="k-mid"><span class="k-big" id="kpi-2h-num">—</span><span class="k-chip pct-chip" id="kpi-2h-chip">—</span></div>
+      </div>
+      <div class="card kp">
+        <div class="k-head"><div class="k-k">Đã sửa (ngày)</div><div class="k-en">Re-inspect fixed (today)</div></div>
+        <div class="k-mid"><span class="k-big" id="kpi-fixed-num">—</span><span class="k-chip pct-chip fill-pass">SỬA</span></div>
+      </div>
+      <div class="card kp">
+        <div class="k-head"><div class="k-k">Tổng lỗi – Lũy kế ngày</div><div class="k-en">Total defects (cumulative)</div></div>
+        <div class="k-mid"><span class="k-big" id="kpi-day-num">—</span><span class="k-chip pct-chip" id="kpi-day-chip">—</span></div>
+      </div>
+    </div>
+
+    <!-- Main -->
+    <div class="main">
+      <!-- Quality -->
+      <div class="card qcard">
+        <div class="panel-title">Chất lượng cuối chuyền <span class="pt-en" id="quality-pt-en">Endline Quality · lỗi & vị trí</span></div>
+        <div class="q-body">
+          <div class="dwrap">
+            <table class="dtbl">
+              <thead>
+                <tr>
+                  <th style="width:42%;">Loại lỗi<span class="en">Type of defect</span></th>
+                  <th>Vị trí<span class="en">Station</span></th>
+                  <th>SL<span class="en">Number</span></th>
+                </tr>
+              </thead>
+              <tbody id="defect-body">
+                <tr><td colspan="3" class="muted" style="padding:2rem;">Chưa có lỗi.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="top3">
+            <div class="top3-t">Top dạng lỗi<br>(lũy kế ngày)</div>
+            <div class="mbars" id="top-bars"></div>
+          </div>
+        </div>
+        <div class="q-foot">
+          <div class="qf"><span class="l">Đã kiểm cuối chuyền (ngày)</span><span class="v" id="kcs-qty">—</span></div>
+          <div class="qf"><span class="l">Đạt</span><span class="v pass" id="kcs-pass">—</span></div>
+          <div class="qf"><span class="l">Lỗi</span><span class="v fail" id="kcs-defect">—</span></div>
+          <div class="qf" style="margin-left:auto;"><span class="l">Tỷ lệ lỗi · Defect rate</span><span class="v" id="kcs-rate">—</span></div>
+        </div>
+      </div>
+
+      <!-- Breakdown -->
+      <div class="card bcard">
+        <div class="panel-title danger">Máy hỏng <span class="pt-en">Machine breakdown</span></div>
+        <div id="brk-area" class="empty">
+          <div class="empty-ic">✓</div>
+          <div class="empty-t">Không có sự cố máy</div>
+          <div class="empty-s">No machine breakdown reported today</div>
+        </div>
+        <div class="b-foot">
+          <div class="b-cell"><div class="l">Số sự cố hôm nay</div><div class="v" id="brk-count">0</div></div>
+          <div class="b-cell"><div class="l">Thời gian dừng máy</div><div class="v" id="brk-mins">0′</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="ftr">
+    <span class="l"><span class="refresh-dot"></span>Cập nhật <span id="ftr-time">—</span> · Auto refresh 1 phút</span>
+    <span class="r">TV-3 · Chất lượng cuối chuyền & Máy hỏng</span>
+  </div>
+
+</div>
+</div>
+</div>
+
+<script>
+const INIT_MONO = {{ init_mono | tojson }};
+const INIT_DATE = {{ init_date | tojson }};
+const REFRESH_MS = 60 * 1000;
+
+function fit() {
+  const s = document.getElementById('stage');
+  s.style.transform = 'scale(' + Math.min(innerWidth / 1920, innerHeight / 1080) + ')';
+}
+fit(); addEventListener('resize', fit);
+
+function tick() {
+  const d = new Date();
+  const el = document.getElementById('clock');
+  if (el) el.textContent = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+tick(); setInterval(tick, 15000);
+
+function fmtNum(n) { if (n == null) return '—'; return Number(n).toLocaleString('vi-VN'); }
+
+async function loadData() {
+  if (!INIT_MONO || !INIT_DATE) {
+    alert('Cần ?mono=...&date=... trên URL. Mở /tv để config.');
+    return;
+  }
+  const url = `/tv/api/tv3?mono=${encodeURIComponent(INIT_MONO)}&date=${INIT_DATE}`;
+  let data;
+  try {
+    data = await fetch(url).then(r => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  } catch (e) {
+    alert('Lỗi load data: ' + e.message);
+    return;
+  }
+  render(data);
+}
+
+function render(d) {
+  // Header
+  const h = d.header;
+  document.getElementById('h-line').textContent = 'Tổ ' + h['Tổ'];
+  document.getElementById('h-style').textContent = h.StyleNo || '—';
+  document.getElementById('h-workers').textContent = h.Workers || '—';
+  document.getElementById('h-workers2').textContent = h.Workers || '—';
+  document.getElementById('h-demand').textContent = h.MaDonKH || '—';
+  document.getElementById('h-customer').textContent = h.Customer || '—';
+  document.getElementById('h-firstday').textContent = h.FirstHangDate ? h.FirstHangDate.substring(5) : '—';
+  document.getElementById('h-wip').textContent = fmtNum(h.WIP);
+
+  const day = new Date(INIT_DATE);
+  const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+  document.getElementById('h-date').textContent =
+    days[day.getDay()] + ' · ' + day.getDate() + '-' + (day.getMonth() + 1) + '-' + day.getFullYear();
+  document.getElementById('ftr-time').textContent =
+    new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+
+  // KPI
+  const k = d.kpi;
+  const reElNum = document.getElementById('kpi-reinspect-num');
+  const reElChip = document.getElementById('kpi-reinspect-chip');
+  reElNum.textContent = k.ReinspectPct + '%';
+  const reOK = k.ReinspectPct >= 80;
+  reElNum.className = 'k-big ' + (reOK ? 'c-pass' : 'c-fail');
+  reElChip.className = 'k-chip pct-chip ' + (reOK ? 'fill-pass' : 'fill-fail');
+  reElChip.textContent = reOK ? 'ĐẠT' : 'CHƯA';
+
+  const num2h = document.getElementById('kpi-2h-num');
+  const chip2h = document.getElementById('kpi-2h-chip');
+  num2h.textContent = fmtNum(k.DefectSlot);
+  const okSlot = k.DefectSlot === 0;
+  num2h.className = 'k-big ' + (okSlot ? 'c-pass' : 'c-fail');
+  chip2h.className = 'k-chip pct-chip ' + (okSlot ? 'fill-pass' : 'fill-fail');
+  chip2h.textContent = okSlot ? 'OK' : 'LỖI';
+  document.getElementById('kpi-slot-en').textContent =
+    k.CurrentSlotLabel || 'No slot data yet';
+  document.getElementById('quality-pt-en').textContent =
+    k.CurrentSlotLabel
+      ? `Endline Quality · ${k.CurrentSlotLabel}`
+      : 'Endline Quality · chưa có dữ liệu mốc nào';
+
+  document.getElementById('quality-pt-en').textContent = 'Endline Quality · cumulative day';
+  document.getElementById('kpi-fixed-num').textContent = fmtNum(k.FixedDay);
+  document.getElementById('kpi-fixed-num').className = 'k-big c-pass';
+
+  const numDay = document.getElementById('kpi-day-num');
+  const chipDay = document.getElementById('kpi-day-chip');
+  numDay.textContent = fmtNum(k.DefectDay);
+  const okDay = k.DefectDay === 0;
+  numDay.className = 'k-big ' + (okDay ? 'c-pass' : 'c-fail');
+  chipDay.className = 'k-chip pct-chip ' + (okDay ? 'fill-pass' : 'fill-fail');
+  chipDay.textContent = okDay ? 'OK' : 'LỖI';
+
+  // Defect table — group theo DefectCode (rowspan)
+  const dbody = document.getElementById('defect-body');
+  if (!d.defects.length) {
+    dbody.innerHTML = '<tr><td colspan="3" style="padding:2rem;color:var(--ink-3);">Chưa có lỗi nào.</td></tr>';
+  } else {
+    let html = '';
+    for (const g of d.defects) {
+      const n = g.Stations.length;
+      g.Stations.forEach((s, i) => {
+        const rowCls = i === 0 ? 'grp-start' : 'grp-mid';
+        html += `<tr class="${rowCls}">`;
+        if (i === 0) {
+          html += `<td class="code" rowspan="${n}">${escape(g.DefectCode)}. ${escape(g.DefectName)}<br><span class="ct">${n} trạm · Tổng ${g.TotalQty}</span></td>`;
+        }
+        html += `<td class="cap">${escape(s.Label)}</td>`;
+        html += `<td class="qty">${fmtNum(s.Qty)}</td>`;
+        html += '</tr>';
+      });
+    }
+    dbody.innerHTML = html;
+  }
+
+  // Top defect bars
+  const tb = document.getElementById('top-bars');
+  if (!d.top_defects.length) {
+    tb.innerHTML = '<div style="color:var(--ink-3);font-size:13px;align-self:center;">Chưa có lỗi.</div>';
+  } else {
+    const topTones = ['tone-red', 'tone-yellow', 'tone-orange'];
+    let lastQty = null;
+    let toneIndex = -1;
+    tb.innerHTML = d.top_defects.map((t) => {
+      if (lastQty === null || t.Qty !== lastQty) {
+        toneIndex += 1;
+      }
+      lastQty = t.Qty;
+      const tone = topTones[Math.min(toneIndex, topTones.length - 1)];
+      return `
+      <div class="mbw">
+        <div class="mbar ${tone}" style="height:${Math.max(t.BarPct * 1.5, 28)}px;">${fmtNum(t.Qty)}</div>
+        <div class="mbl">${escape(t.DefectCode)}</div>
+      </div>
+    `;
+    }).join('');
+  }
+
+  // KCS footer
+  document.getElementById('kcs-qty').innerHTML = fmtNum(d.kcs.Qty) + ' <span style="font-size:12px;color:var(--ink-3)">pcs</span>';
+  document.getElementById('kcs-pass').textContent = fmtNum(d.kcs.Pass);
+  document.getElementById('kcs-defect').textContent = fmtNum(d.kcs.Defect);
+  const rateEl = document.getElementById('kcs-rate');
+  const rateOk = d.kcs.DefectRate <= k.DefectThreshold;
+  rateEl.className = 'v ' + (rateOk ? 'pass' : 'fail');
+  rateEl.innerHTML = d.kcs.DefectRate + '% <span style="font-size:12px;color:var(--ink-3)">≤ ' + k.DefectThreshold + '%</span>';
+
+  // Breakdown
+  const brkArea = document.getElementById('brk-area');
+  if (!d.breakdowns.length) {
+    brkArea.className = 'empty';
+    brkArea.innerHTML = `
+      <div class="empty-ic">✓</div>
+      <div class="empty-t">Không có sự cố máy</div>
+      <div class="empty-s">No machine breakdown reported today</div>
+    `;
+  } else {
+    brkArea.className = 'blist';
+    brkArea.innerHTML = d.breakdowns.map(b => `
+      <div class="brow">
+        <div>
+          <div class="m-name">${escape(b.MachineName)}</div>
+          ${b.Reason ? `<div class="m-reason">${escape(b.Reason)}</div>` : ''}
+        </div>
+        <div class="m-min">${b.DownMinutes}′</div>
+      </div>
+    `).join('');
+  }
+  document.getElementById('brk-count').textContent = d.breakdown_count;
+  document.getElementById('brk-count').className = 'v ' + (d.breakdown_count === 0 ? '' : 'warn');
+  document.getElementById('brk-mins').textContent = d.downtime_min + '′';
+  document.getElementById('brk-mins').className = 'v ' + (d.downtime_min === 0 ? '' : 'warn');
+}
+
+function escape(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function truncate(s, n) { return (s && s.length > n) ? s.substring(0, n - 1) + '…' : (s || ''); }
+
+loadData();
+setInterval(loadData, REFRESH_MS);
+</script>
+</body>
+</html>

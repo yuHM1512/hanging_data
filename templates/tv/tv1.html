@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>TV-1 · Sản lượng & nhịp độ</title>
+<link rel="stylesheet" href="/static/css/tv/base.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* (Sao chép từ mockup tv1-a.html — phiên bản Refined Light) */
+  .va { --gap: var(--s-5); }
+  .va .stage-inner { background: var(--canvas); }
+
+  .hdr {
+    background: linear-gradient(120deg, var(--brand-900) 0%, var(--brand-700) 62%, var(--brand-600) 100%);
+    border-radius: var(--r-lg); box-shadow: var(--sh-2); color: #fff;
+    display: grid; grid-template-columns: auto 1px 1fr auto;
+    align-items: center; gap: var(--s-6); padding: var(--s-4) var(--s-6); min-height: 104px;
+  }
+  .hdr-line { display: flex; flex-direction: column; gap: 2px; padding-right: var(--s-2); }
+  .hdr-line .lk { font-size: 12px; letter-spacing: .12em; opacity: .75; text-transform: uppercase; font-weight: 600; }
+  .hdr-line .lv { font-family: var(--font-mono); font-weight: 700; font-size: 44px; line-height: 1; letter-spacing: .01em; }
+  .hdr-line .style { margin-top: 3px; font-size: 15px; font-weight: 600; color: #BBF7D0; letter-spacing: .01em; }
+  .hdr-div { width: 1px; height: 64px; background: rgba(255,255,255,.18); }
+  .hdr-fields { display: grid; grid-template-columns: repeat(6, auto); justify-content: space-between; gap: var(--s-5); align-items: center; }
+  .fld { display: flex; flex-direction: column; gap: 6px; }
+  .fld .k { font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: rgba(255,255,255,.7); font-weight: 600; }
+  .fld .v { font-size: 26px; font-weight: 700; line-height: 1; }
+  .fld .v.mono { font-family: var(--font-mono); letter-spacing: -.01em; }
+  .fld .v.demand { font-size: 22px; color: #DDE7F8; letter-spacing: 0; }
+  .hdr-clock { text-align: right; display: flex; flex-direction: column; gap: 4px; padding-left: var(--s-4); border-left: 1px solid rgba(255,255,255,.18); }
+  .hdr-clock .date { font-size: 14px; color: rgba(255,255,255,.78); letter-spacing: .04em; font-weight: 500; }
+  .hdr-clock .time { font-family: var(--font-mono); font-weight: 700; font-size: 38px; line-height: 1; color: #fff; }
+
+  .body { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 348px; gap: var(--gap); }
+  .main { display: grid; grid-template-rows: auto 1fr auto; gap: var(--gap); min-height: 0; }
+  .kpi { display: grid; grid-template-columns: 360px 1fr; gap: var(--gap); }
+  .card { background: var(--surface); border: 1px solid var(--divider); border-radius: var(--r-md); box-shadow: var(--sh-1); overflow: hidden; }
+  .sec-label { font-size: var(--fs-label); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); margin-bottom: var(--s-3); display: flex; align-items: center; gap: var(--s-3); }
+  .sec-label::after { content: ""; flex: 1; height: 1px; background: var(--divider); }
+
+  .hero { display: flex; flex-direction: column; padding: var(--s-5) var(--s-6); }
+  .hero .h-top { display: flex; justify-content: space-between; align-items: baseline; }
+  .hero .h-title { font-size: var(--fs-s); font-weight: 700; color: var(--brand-ink); }
+  .hero .h-en { font-size: var(--fs-micro); color: var(--ink-3); }
+  .hero .h-mid { margin: auto 0; }
+  .hero .pct-line { display: flex; align-items: flex-end; justify-content: space-between; }
+  .hero .pct { font-family: var(--font-mono); font-weight: 700; font-size: 72px; line-height: .85; }
+  .hero .pct-tag { font-size: var(--fs-micro); font-weight: 700; padding: 4px 10px; border-radius: var(--r-pill); letter-spacing: .04em; margin-bottom: 10px; }
+  .hero .h-rows { display: flex; gap: var(--s-8); margin-top: var(--s-5); padding-top: var(--s-4); border-top: 1px solid var(--divider); }
+  .hero .h-rows .r .rk { font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); }
+  .hero .h-rows .r .rv { font-family: var(--font-mono); font-weight: 700; font-size: 28px; color: var(--ink); line-height: 1.1; }
+  .bar { height: 12px; border-radius: var(--r-pill); background: var(--surface-2); overflow: hidden; margin-top: var(--s-4); border: 1px solid var(--divider); }
+  .bar > i { display: block; height: 100%; border-radius: var(--r-pill); }
+
+  .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--gap); }
+  .stat { display: flex; flex-direction: column; padding: var(--s-4); gap: var(--s-2); }
+  .stat .s-head { display: flex; flex-direction: column; gap: 1px; }
+  .stat .s-k { font-size: var(--fs-label); font-weight: 700; color: var(--brand-ink); letter-spacing: .01em; line-height: 1.15; }
+  .stat .s-en { font-size: var(--fs-micro); color: var(--ink-3); }
+  .stat .s-mid { flex: 1; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 6px; }
+  .stat .s-pct { font-family: var(--font-mono); font-weight: 700; font-size: 42px; line-height: .9; }
+  .stat .s-sub { display: flex; gap: var(--s-4); padding-top: var(--s-2); border-top: 1px solid var(--divider-2); }
+  .stat .s-sub .ss { display: flex; align-items: baseline; gap: 5px; }
+  .stat .s-sub .ssk { font-size: var(--fs-micro); color: var(--ink-3); text-transform: uppercase; letter-spacing: .04em; }
+  .stat .s-sub .ssv { font-family: var(--font-mono); font-weight: 700; font-size: 16px; color: var(--ink-2); }
+  .pct-chip { font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: var(--r-pill); letter-spacing: .03em; align-self: flex-start; }
+  .endday .ed-line { display: flex; align-items: center; gap: var(--s-2); }
+  .endday .edv { font-family: var(--font-mono); font-weight: 700; font-size: 30px; line-height: 1; }
+  .endday .ed-arrow { color: var(--ink-3); font-size: 20px; }
+
+  .hours-sec { display: flex; flex-direction: column; min-height: 0; }
+  .hours { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--gap); flex: 1; min-height: 0; }
+  .hour { background: linear-gradient(158deg, var(--brand-700) 0%, var(--brand-900) 100%); border-radius: var(--r-md); box-shadow: var(--sh-2); overflow: hidden; display: flex; flex-direction: column; }
+  .hour .h-time { background: rgba(255,255,255,.10); color: #fff; font-family: var(--font-mono); font-weight: 700; font-size: 30px; text-align: center; padding: 13px; letter-spacing: .02em; }
+  .hour .h-pair { display: grid; grid-template-columns: 1fr 1fr; flex: 1; }
+  .hour .hc { padding: 12px 6px; text-align: center; display: flex; flex-direction: column; gap: 7px; align-items: center; justify-content: center; }
+  .hour .hc + .hc { border-left: 1px solid rgba(255,255,255,.14); }
+  .hour .hc:not(.act) { background: var(--surface); }
+  .hour .hc:not(.act) .hk { color: var(--brand-500); }
+  .hour .hc:not(.act) .hv { color: var(--brand-ink); }
+  .hour .hc .hk { font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .07em; color: rgba(255,255,255,.62); }
+  .hour .hc .hv { font-family: var(--font-mono); font-weight: 700; font-size: 50px; line-height: 1; color: #fff; }
+  .hour .hc.act.is-fail { background: var(--fail-solid); }
+  .hour .hc.act.is-fail .hk { color: rgba(255,255,255,.85); }
+  .hour .hc.act.is-fail .hv { color: #fff; }
+  .hour .hc.act.is-pass { background: var(--pass-solid); }
+  .hour .hc.act.is-pass .hk { color: rgba(11,61,36,.72); }
+  .hour .hc.act.is-pass .hv { color: #0B3D24; }
+  .hour .hc.act.is-empty { background: rgba(255,255,255,.05); }
+  .hour .hc.act.is-empty .hk { color: rgba(255,255,255,.5); }
+  .hour .hc.act.is-empty .hv { color: rgba(255,255,255,.4); }
+
+  .rc { background: var(--warn-soft); border: 1px solid var(--warn-line); border-left: 5px solid var(--warn-solid); border-radius: var(--r-md); padding: var(--s-3) var(--s-6); display: flex; flex-direction: column; gap: var(--s-1); min-height: 0; }
+  .rc .rc-h { font-size: var(--fs-label); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--warn-ink); margin-bottom: var(--s-2); display: flex; align-items: center; gap: var(--s-2); }
+  .rc .rc-item { display: flex; gap: var(--s-4); padding: var(--s-2) 0; font-size: 15px; color: var(--ink); line-height: 1.45; border-top: 1px dashed var(--warn-line); }
+  .rc .rc-item:first-of-type { border-top: none; }
+  .rc .rc-t { font-family: var(--font-mono); font-weight: 700; color: var(--warn-ink); font-size: 17px; min-width: 58px; }
+  .rc .rc-item b { color: var(--brand-ink); }
+  .rc .rc-empty { font-size: 14px; color: var(--ink-3); font-style: italic; }
+
+  .ehd { background: var(--surface); border: 1px solid var(--divider); border-radius: var(--r-md); box-shadow: var(--sh-1); display: flex; flex-direction: column; overflow: hidden; }
+  .ehd .e-head { background: linear-gradient(120deg, var(--brand-800), var(--brand-600)); color: #fff; padding: var(--s-4) var(--s-5); }
+  .ehd .e-head .t1 { font-size: var(--fs-s); font-weight: 700; letter-spacing: .04em; }
+  .ehd .e-head .t2 { font-size: var(--fs-micro); opacity: .8; margin-top: 2px; }
+  .ehd .e-list { padding: var(--s-3); display: flex; flex-direction: column; justify-content: flex-start; gap: 9px; flex: 1; min-height: 0; overflow-y: auto; }
+  .ehd .e-item { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--s-3); padding: 10px 12px; border-radius: var(--r-sm); background: var(--surface-2); border: 1px solid var(--divider-2); border-left: 3px solid var(--pass-solid); }
+  .ehd .e-po { font-family: var(--font-mono); font-weight: 700; font-size: 16px; color: var(--brand-ink); }
+  .ehd .e-date { font-size: var(--fs-micro); color: var(--ink-3); margin-top: 2px; }
+  .ehd .e-qty { font-family: var(--font-mono); font-weight: 700; font-size: 22px; color: var(--ink); text-align: right; }
+  .ehd .e-qty small { display: block; font-size: 9px; font-weight: 500; color: var(--ink-3); letter-spacing: .08em; }
+  .ehd .e-total { margin-top: auto; display: flex; justify-content: space-between; align-items: baseline; padding: var(--s-4) var(--s-5); border-top: 2px solid var(--divider); background: var(--brand-tint); font-size: var(--fs-label); font-weight: 700; color: var(--brand-ink); text-transform: uppercase; letter-spacing: .04em; }
+  .ehd .e-total .mono { font-family: var(--font-mono); font-size: 24px; }
+  .ehd .e-total small { font-size: 10px; color: var(--ink-3); letter-spacing: .08em; }
+  .ehd .e-empty { padding: var(--s-5); color: var(--ink-3); font-style: italic; text-align: center; }
+
+  .ftr { display: flex; justify-content: space-between; align-items: center; font-size: var(--fs-label); color: var(--ink-2); padding: 2px var(--s-2); }
+  .ftr .l { display: flex; align-items: center; gap: var(--s-2); }
+  .ftr .r { font-weight: 600; color: var(--brand-ink); letter-spacing: .02em; }
+  .refresh-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--pass-solid); display: inline-block; }
+
+  .fill-pass { background: var(--pass-soft); color: var(--pass-ink); }
+  .fill-fail { background: var(--fail-soft); color: var(--fail-ink); }
+  .c-pass { color: var(--pass-ink); }
+  .c-fail { color: var(--fail-ink); }
+  .c-ink { color: var(--ink); }
+</style>
+</head>
+<body class="va">
+<div class="stage-wrap">
+<div class="stage" id="stage">
+<div class="stage-inner">
+
+  <div class="hdr">
+    <div class="hdr-line">
+      <span class="lk">Tổ</span>
+      <span class="lv" id="h-line">—</span>
+      <span class="style"><span id="h-style">—</span> · <span id="h-workers">—</span> LĐ</span>
+    </div>
+    <div class="hdr-div"></div>
+    <div class="hdr-fields">
+      <div class="fld"><span class="k">Số đơn hàng</span><span class="v demand mono" id="h-demand">—</span></div>
+      <div class="fld"><span class="k">K.Hàng / Customer</span><span class="v" id="h-customer">—</span></div>
+      <div class="fld"><span class="k">Rải chuyền / First day</span><span class="v mono" id="h-firstday">—</span></div>
+      <div class="fld"><span class="k">Hàng tồn / WIP</span><span class="v mono" id="h-wip">—</span></div>
+      <div class="fld"><span class="k">TPT (phút)</span><span class="v mono" id="h-tpt">—</span></div>
+      <div class="fld"><span class="k">Lao động / Workers</span><span class="v mono" id="h-workers2">—</span></div>
+    </div>
+    <div class="hdr-clock">
+      <span class="date" id="h-date">—</span>
+      <span class="time" id="clock">--:--</span>
+    </div>
+  </div>
+
+  <div class="body">
+    <div class="main">
+
+      <div class="kpi">
+        <div class="card hero">
+          <div class="h-top">
+            <span class="h-title">Tiến độ tổng</span>
+            <span class="h-en">Total progress</span>
+          </div>
+          <div class="h-mid">
+            <div class="pct-line">
+              <span class="pct" id="hero-pct">—</span>
+              <span class="pct-tag" id="hero-tag">—</span>
+            </div>
+            <div class="bar"><i id="hero-bar" style="width:0%; background:var(--fail-solid);"></i></div>
+          </div>
+          <div class="h-rows">
+            <div class="r"><div class="rk">Kế hoạch</div><div class="rv" id="hero-kh">—</div></div>
+            <div class="r"><div class="rk">Thực hiện</div><div class="rv" id="hero-th">—</div></div>
+            <div class="r" style="margin-left:auto; text-align:right;"><div class="rk">Còn lại</div><div class="rv" id="hero-remain">—</div></div>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="card stat">
+            <div class="s-head"><div class="s-k">SL Ngày</div><div class="s-en">Day qty · QC passed</div></div>
+            <div class="s-mid"><span class="s-pct" id="st-day-pct">—</span><span class="pct-chip" id="st-day-chip">—</span></div>
+            <div class="s-sub"><div class="ss"><span class="ssk">KH</span><span class="ssv" id="st-day-kh">—</span></div><div class="ss"><span class="ssk">TH</span><span class="ssv" id="st-day-th">—</span></div></div>
+          </div>
+
+          <div class="card stat">
+            <div class="s-head"><div class="s-k">Nhịp độ · Takt</div><div class="s-en">s/pc</div></div>
+            <div class="s-mid"><span class="s-pct" id="st-takt-pct">—</span><span class="pct-chip" id="st-takt-chip">—</span></div>
+            <div class="s-sub"><div class="ss"><span class="ssk">KH</span><span class="ssv" id="st-takt-kh">—</span></div><div class="ss"><span class="ssk">TT</span><span class="ssv" id="st-takt-tt">—</span></div></div>
+          </div>
+
+          <div class="card stat">
+            <div class="s-head"><div class="s-k">Hiệu suất OWE</div><div class="s-en">Working eff.</div></div>
+            <div class="s-mid"><span class="s-pct" id="st-owe-pct">—</span><span class="pct-chip" id="st-owe-chip">—</span></div>
+            <div class="s-sub"><div class="ss"><span class="ssk">Mục tiêu</span><span class="ssv" id="st-owe-target">—</span></div></div>
+          </div>
+
+          <div class="card stat">
+            <div class="s-head"><div class="s-k">Tỷ lệ lỗi</div><div class="s-en">Defect rate</div></div>
+            <div class="s-mid"><span class="s-pct" id="st-def-pct">—</span><span class="pct-chip" id="st-def-chip">—</span></div>
+            <div class="s-sub"><div class="ss"><span class="ssk">Ngưỡng</span><span class="ssv">≤ 5%</span></div></div>
+          </div>
+
+          <div class="card stat endday">
+            <div class="s-head"><div class="s-k">Ngày kết thúc</div><div class="s-en">End day · MT → TT</div></div>
+            <div class="s-mid"><div class="ed-line"><span class="edv c-ink" id="st-end-mt">—</span><span class="ed-arrow">→</span><span class="edv" id="st-end-tt">—</span></div></div>
+            <div class="s-sub"><span class="pct-chip" id="st-end-chip">—</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hours-sec">
+        <div class="sec-label">Tiến độ theo khung giờ · Hourly output</div>
+        <div class="hours" id="hours-grid">
+          <!-- 5 slot rendered by JS -->
+        </div>
+      </div>
+
+      <div class="rc">
+        <div class="rc-h">⚠ Nguyên nhân & Hành động khắc phục · Root cause & CAP</div>
+        <div id="rc-list">
+          <div class="rc-empty">Chưa có ghi nhận HĐKP cho ngày này.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ehd">
+      <div class="e-head">
+        <div class="t1">EHD Information</div>
+        <div class="t2">Thông tin xuất hàng · Expected hand-over date</div>
+      </div>
+      <div class="e-list" id="ehd-list">
+        <div class="e-empty">Đang tải...</div>
+      </div>
+      <div class="e-total">
+        <span>Tổng đơn / Total</span>
+        <span class="mono" id="ehd-total">— <small>PCS</small></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="ftr">
+    <span class="l"><span class="refresh-dot"></span>Cập nhật <span id="ftr-time">—</span> · Auto refresh 5 phút</span>
+    <span class="r">TV-1 · Theo dõi sản lượng & nhịp độ theo giờ</span>
+  </div>
+
+</div>
+</div>
+</div>
+
+<script>
+const INIT_MONO = {{ init_mono | tojson }};
+const INIT_DATE = {{ init_date | tojson }};
+const REFRESH_MS = 5 * 60 * 1000;
+
+function fit() {
+  const s = document.getElementById('stage');
+  s.style.transform = 'scale(' + Math.min(innerWidth / 1920, innerHeight / 1080) + ')';
+}
+fit(); addEventListener('resize', fit);
+
+// Test mode: clock hiển thị cuối ngày (22:00) thay vì real-time
+// để giả lập view "end of day" với toàn bộ data của ngày được chọn.
+function tick() {
+  const el = document.getElementById('clock');
+  if (el) el.textContent = '22:00';
+}
+tick();
+
+function fmtNum(n) {
+  if (n == null) return '—';
+  return Number(n).toLocaleString('vi-VN');
+}
+function passFail(pass) { return pass ? 'fill-pass' : 'fill-fail'; }
+function passFailText(pass) { return pass ? 'c-pass' : 'c-fail'; }
+
+async function loadData() {
+  if (!INIT_MONO || !INIT_DATE) {
+    alert('Cần ?mono=...&date=... trên URL. Mở /tv để config.');
+    return;
+  }
+  const url = `/tv/api/tv1?mono=${encodeURIComponent(INIT_MONO)}&date=${INIT_DATE}`;
+  let data;
+  try {
+    data = await fetch(url).then(r => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  } catch (e) {
+    alert('Lỗi load data: ' + e.message);
+    return;
+  }
+  render(data);
+}
+
+function render(d) {
+  const h = d.header;
+  document.getElementById('h-line').textContent = 'Tổ ' + h['Tổ'];
+  document.getElementById('h-style').textContent = 'Style ' + (h.StyleNo || '—');
+  document.getElementById('h-workers').textContent = h.Workers || '—';
+  document.getElementById('h-workers2').textContent = h.Workers || '—';
+  document.getElementById('h-demand').textContent = h.MaDonKH || '—';
+  document.getElementById('h-customer').textContent = h.Customer || '—';
+  document.getElementById('h-firstday').textContent = h.FirstHangDate ? h.FirstHangDate.substring(5).replace('-', '-') : '—';
+  document.getElementById('h-wip').textContent = fmtNum(h.WIP);
+  document.getElementById('h-tpt').textContent = fmtNum(h.TPT);
+
+  // Date label
+  const day = new Date(INIT_DATE);
+  const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+  document.getElementById('h-date').textContent =
+    days[day.getDay()] + ' · ' + day.getDate() + '-' + (day.getMonth() + 1) + '-' + day.getFullYear();
+  document.getElementById('ftr-time').textContent = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+
+  // Hero
+  const ho = d.hero;
+  const heroPass = ho.Pct >= 100;
+  document.getElementById('hero-pct').textContent = ho.Pct + '%';
+  document.getElementById('hero-pct').className = 'pct ' + passFailText(heroPass);
+  document.getElementById('hero-tag').textContent = heroPass ? 'ĐẠT' : 'CHƯA ĐẠT';
+  document.getElementById('hero-tag').className = 'pct-tag ' + passFail(heroPass);
+  document.getElementById('hero-bar').style.width = Math.min(ho.Pct, 100) + '%';
+  document.getElementById('hero-bar').style.background = heroPass ? 'var(--pass-solid)' : 'var(--fail-solid)';
+  document.getElementById('hero-kh').textContent = fmtNum(ho.SLKH);
+  document.getElementById('hero-th').textContent = fmtNum(ho.TH);
+  document.getElementById('hero-remain').textContent = fmtNum(ho.Remain);
+
+  // Stats
+  const s = d.stats;
+  const dpass = s.DayQty.Pct >= 100;
+  document.getElementById('st-day-pct').textContent = s.DayQty.Pct + '%';
+  document.getElementById('st-day-pct').className = 's-pct ' + passFailText(dpass);
+  document.getElementById('st-day-chip').textContent = dpass ? 'ĐẠT' : 'CHƯA ĐẠT';
+  document.getElementById('st-day-chip').className = 'pct-chip ' + passFail(dpass);
+  document.getElementById('st-day-kh').textContent = fmtNum(s.DayQty.KH);
+  document.getElementById('st-day-th').textContent = fmtNum(s.DayQty.TH);
+
+  const tpass = s.Takt.Pct >= 100;
+  document.getElementById('st-takt-pct').textContent = s.Takt.Pct + '%';
+  document.getElementById('st-takt-pct').className = 's-pct ' + passFailText(tpass);
+  document.getElementById('st-takt-chip').textContent = tpass ? 'ĐẠT' : 'CHƯA ĐẠT';
+  document.getElementById('st-takt-chip').className = 'pct-chip ' + passFail(tpass);
+  document.getElementById('st-takt-kh').textContent = fmtNum(s.Takt.KH);
+  document.getElementById('st-takt-tt').textContent = fmtNum(s.Takt.TT);
+
+  const opass = s.OWE.Pct >= s.OWE.Target;
+  document.getElementById('st-owe-pct').textContent = s.OWE.Pct + '%';
+  document.getElementById('st-owe-pct').className = 's-pct ' + passFailText(opass);
+  document.getElementById('st-owe-chip').textContent = opass ? 'ĐẠT' : 'CHƯA ĐẠT';
+  document.getElementById('st-owe-chip').className = 'pct-chip ' + passFail(opass);
+  document.getElementById('st-owe-target').textContent = s.OWE.Target + '%';
+
+  const defOK = s.DefectRate.Pct <= s.DefectRate.Threshold;
+  document.getElementById('st-def-pct').textContent = s.DefectRate.Pct + '%';
+  document.getElementById('st-def-pct').className = 's-pct ' + passFailText(defOK);
+  document.getElementById('st-def-chip').textContent = defOK ? 'ĐẠT' : 'VƯỢT NGƯỠNG';
+  document.getElementById('st-def-chip').className = 'pct-chip ' + passFail(defOK);
+
+  const ed = s.EndDay;
+  document.getElementById('st-end-mt').textContent = ed.Target || '—';
+  document.getElementById('st-end-tt').textContent = ed.Actual || '—';
+  const endOK = ed.DiffDays != null && ed.DiffDays <= 0;
+  document.getElementById('st-end-tt').className = 'edv ' + passFailText(endOK);
+  if (ed.DiffDays == null) {
+    document.getElementById('st-end-chip').textContent = '—';
+    document.getElementById('st-end-chip').className = 'pct-chip';
+  } else if (ed.DiffDays === 0) {
+    document.getElementById('st-end-chip').textContent = 'ĐÚNG HẠN';
+    document.getElementById('st-end-chip').className = 'pct-chip fill-pass';
+  } else if (ed.DiffDays > 0) {
+    document.getElementById('st-end-chip').textContent = `LỆCH +${ed.DiffDays} NGÀY`;
+    document.getElementById('st-end-chip').className = 'pct-chip fill-fail';
+  } else {
+    document.getElementById('st-end-chip').textContent = `SỚM ${-ed.DiffDays} NGÀY`;
+    document.getElementById('st-end-chip').className = 'pct-chip fill-pass';
+  }
+
+  // Hours
+  const hoursEl = document.getElementById('hours-grid');
+  hoursEl.innerHTML = d.hours.map(h => {
+    const hasActual = h.th != null && h.th > 0;
+    let actClass = 'is-empty';
+    let thDisp = '—';
+    if (hasActual) {
+      thDisp = fmtNum(h.th);
+      actClass = h.th >= h.kh ? 'is-pass' : 'is-fail';
+    }
+    return `
+      <div class="hour">
+        <div class="h-time">${h.label}</div>
+        <div class="h-pair">
+          <div class="hc"><span class="hk">KH</span><span class="hv">${fmtNum(h.kh)}</span></div>
+          <div class="hc act ${actClass}"><span class="hk">TH</span><span class="hv">${thDisp}</span></div>
+        </div>
+      </div>`;
+  }).join('');
+
+  // HĐKP
+  const rcList = document.getElementById('rc-list');
+  if (d.hdkp.length === 0) {
+    rcList.innerHTML = '<div class="rc-empty">Chưa có ghi nhận HĐKP cho ngày này.</div>';
+  } else {
+    const slotLabels = ['', '9:30', '11:30', '14:30', '16:30', 'Sau 16:30'];
+    rcList.innerHTML = d.hdkp.map(h => `
+      <div class="rc-item">
+        <span class="rc-t">${slotLabels[h.Slot] || h.Slot}</span>
+        <span><b>Nguyên nhân:</b> ${h.RootCause || '—'} ${h.CAPAction ? '&nbsp; <b>HĐKP:</b> ' + h.CAPAction : ''}</span>
+      </div>`).join('');
+  }
+
+  // EHD
+  const ehdEl = document.getElementById('ehd-list');
+  if (d.pos.length === 0) {
+    ehdEl.innerHTML = '<div class="e-empty">Chưa có PO. Nhập trong Admin → Nhu cầu con.</div>';
+  } else {
+    ehdEl.innerHTML = d.pos.map(p => `
+      <div class="e-item">
+        <div><div class="e-po">${p.PONo}</div><div class="e-date">${p.ShipDate}</div></div>
+        <div class="e-qty">${fmtNum(p.Qty)}<small>PCS</small></div>
+      </div>`).join('');
+  }
+  document.getElementById('ehd-total').innerHTML = fmtNum(d.total_po_qty) + ' <small>PCS</small>';
+}
+
+loadData();
+setInterval(loadData, REFRESH_MS);
+</script>
+</body>
+</html>

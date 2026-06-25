@@ -1,0 +1,69 @@
+/* ============================================================
+   Design tokens v2 — Dashboard Chuyền Treo (refined)
+   Mục tiêu: thang chữ nghiêm ngặt + spacing cân đối + đỏ bớt gắt
+   ============================================================ */
+:root {
+  /* ── Navy / Brand ─────────────────────────────────── */
+  --brand-900: #142A52;   /* deep navy — header sang trọng */
+  --brand-800: #1A3567;
+  --brand-700: #21437E;   /* primary */
+  --brand-600: #2B5494;
+  --brand-500: #3C68AE;
+  --brand-soft: #EAF1FB;  /* tint nền KPI head */
+  --brand-tint: #F3F7FD;
+  --brand-ink: #1C3A6E;   /* navy dùng làm chữ trên nền sáng */
+
+  /* ── PASS (Đạt mục tiêu) ──────────────────────────── */
+  --pass-solid: #59C78C;  /* fill xanh, tinh chỉnh từ #63D297 */
+  --pass-soft:  #E6F6ED;
+  --pass-line:  #BCE9CE;
+  --pass-ink:   #14693F;  /* chữ xanh đậm trên nền sáng */
+
+  /* ── FAIL (Chưa đạt) — đỏ MỀM hơn, không còn #FF0000 ── */
+  --fail-solid: #D74C4C;  /* brick red, oklch(.58 .16 25) */
+  --fail-soft:  #FBEAEA;
+  --fail-line:  #F2C9C9;
+  --fail-ink:   #A6332F;
+
+  /* ── WARN (root cause) ────────────────────────────── */
+  --warn-solid: #E0A53B;
+  --warn-soft:  #FBF1DC;
+  --warn-line:  #EFD6A0;
+  --warn-ink:   #8A5A12;
+
+  /* ── Neutral (cool slate) ─────────────────────────── */
+  --canvas:    #EAEFF5;
+  --surface:   #FFFFFF;
+  --surface-2: #F5F8FC;
+  --divider:   #E4EAF1;
+  --divider-2: #EEF2F7;
+  --ink:       #14233B;
+  --ink-2:     #4C5A70;
+  --ink-3:     #8593A8;
+
+  /* ── Type scale (cho khung 1920×1080) ─────────────── */
+  --fs-hero:  62px;   /* số anh hùng */
+  --fs-xl:    44px;
+  --fs-l:     32px;
+  --fs-m:     25px;
+  --fs-s:     19px;
+  --fs-body:  15px;
+  --fs-label: 13px;   /* nhãn uppercase */
+  --fs-micro: 11px;   /* nhãn phụ / EN */
+
+  /* ── Spacing (8px grid) ───────────────────────────── */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 20px; --s-6: 24px; --s-8: 32px; --s-10: 40px;
+
+  /* ── Radius ───────────────────────────────────────── */
+  --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-pill: 999px;
+
+  /* ── Shadow ───────────────────────────────────────── */
+  --sh-1: 0 1px 2px rgba(20,35,59,0.06), 0 1px 3px rgba(20,35,59,0.04);
+  --sh-2: 0 4px 14px rgba(20,35,59,0.08);
+  --sh-3: 0 10px 30px rgba(20,35,59,0.12);
+
+  /* ── Type families ────────────────────────────────── */
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Roboto Mono', ui-monospace, 'Consolas', monospace;
+}

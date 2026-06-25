@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>TV-3 · Chất lượng cuối chuyền & Máy hỏng</title>
+<link rel="stylesheet" href="../tv-shared-v2.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  .body { flex: 1; min-height: 0; display: grid; grid-template-rows: auto 1fr; gap: var(--s-5); }
+
+  /* ── KPI row ─────────────────────────────────────── */
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s-5); }
+  .kp { display: flex; flex-direction: column; padding: var(--s-4) var(--s-5); gap: var(--s-2); }
+  .kp .k-head { display: flex; flex-direction: column; gap: 1px; }
+  .kp .k-k { font-size: var(--fs-label); font-weight: 700; color: var(--brand-ink); line-height: 1.15; }
+  .kp .k-en { font-size: var(--fs-micro); color: var(--ink-3); }
+  .kp .k-mid { flex: 1; display: flex; align-items: center; gap: var(--s-4); }
+  .kp .k-big { font-family: var(--font-mono); font-weight: 700; font-size: 52px; line-height: .9; }
+  .kp .k-chip { align-self: center; }
+
+  /* ── Main ────────────────────────────────────────── */
+  .main { display: grid; grid-template-columns: 7fr 5fr; gap: var(--s-5); min-height: 0; }
+  .qcard, .bcard { display: flex; flex-direction: column; min-height: 0; }
+  .q-body { flex: 1; display: grid; grid-template-columns: 1fr 320px; min-height: 0; }
+  .q-foot { display: flex; gap: var(--s-10); padding: var(--s-4) var(--s-6); border-top: 1px solid var(--divider); background: var(--surface-2); }
+  .q-foot .qf { display: flex; flex-direction: column; gap: 3px; }
+  .q-foot .qf .l { font-size: var(--fs-micro); color: var(--ink-3); text-transform: uppercase; letter-spacing: .04em; }
+  .q-foot .qf .v { font-family: var(--font-mono); font-weight: 700; font-size: 22px; color: var(--ink); }
+  .q-foot .qf .v.pass { color: var(--pass-ink); }
+  .q-foot .qf .v.fail { color: var(--fail-ink); }
+
+  /* Defect table */
+  .dwrap { display: flex; flex-direction: column; min-height: 0; }
+  .dtbl { width: 100%; border-collapse: collapse; }
+  .dtbl th { background: var(--brand-700); color: #fff; padding: var(--s-3) var(--s-3); font-size: var(--fs-label); font-weight: 600; text-align: center; }
+  .dtbl th .en { display: block; font-weight: 400; font-size: 10px; opacity: .8; margin-top: 1px; }
+  .dtbl td { padding: var(--s-4) var(--s-3); border-bottom: 1px solid var(--divider); font-size: var(--fs-body); text-align: center; vertical-align: middle; }
+  .dtbl td.code { font-family: var(--font-mono); font-weight: 700; text-align: left; color: var(--fail-ink); padding-left: var(--s-5); }
+  .dtbl td.qty { background: var(--fail-solid); color: #fff; font-family: var(--font-mono); font-weight: 700; font-size: 26px; }
+  .dtbl td.cap { font-size: var(--fs-label); color: var(--ink-2); text-align: left; line-height: 1.4; }
+
+  /* Top defects mini chart */
+  .top3 { border-left: 1px solid var(--divider); padding: var(--s-4); display: flex; flex-direction: column; min-height: 0; }
+  .top3-t { text-align: center; font-size: var(--fs-label); font-weight: 700; color: var(--brand-ink); text-transform: uppercase; letter-spacing: .04em; margin-bottom: var(--s-4); }
+  .mbars { flex: 1; display: flex; align-items: end; justify-content: center; gap: var(--s-6); padding-bottom: var(--s-3); }
+  .mbw { flex: 1; max-width: 96px; display: flex; flex-direction: column; align-items: center; gap: var(--s-3); }
+  .mbar { width: 100%; background: linear-gradient(180deg, #E47C7C, var(--fail-solid)); border-radius: 8px 8px 0 0; display: flex; justify-content: center; padding-top: var(--s-3); color: #fff; font-family: var(--font-mono); font-weight: 700; font-size: 26px; box-shadow: var(--sh-2); }
+  .mbl { font-size: var(--fs-label); text-align: center; color: var(--ink-2); font-weight: 600; line-height: 1.25; }
+
+  /* Breakdown panel */
+  .empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-4); padding: var(--s-8); text-align: center; }
+  .empty-ic { width: 110px; height: 110px; border-radius: 50%; background: var(--pass-soft); border: 3px solid var(--pass-solid); color: var(--pass-ink); display: flex; align-items: center; justify-content: center; font-size: 58px; font-weight: 700; }
+  .empty-t { color: var(--pass-ink); font-size: 26px; font-weight: 700; }
+  .empty-s { color: var(--ink-3); font-size: var(--fs-body); }
+  .b-foot { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--divider); }
+  .b-cell { padding: var(--s-4) var(--s-5); text-align: center; }
+  .b-cell + .b-cell { border-left: 1px solid var(--divider); }
+  .b-cell .l { font-size: var(--fs-micro); color: var(--ink-3); text-transform: uppercase; letter-spacing: .04em; }
+  .b-cell .v { font-family: var(--font-mono); font-weight: 700; font-size: 30px; color: var(--pass-ink); margin-top: 3px; }
+</style>
+</head>
+<body class="tv">
+<div class="stage-wrap">
+<div class="stage" id="stage">
+<div class="stage-inner">
+
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="hdr-line">
+      <span class="lk">Line</span><span class="lv">U3-L1</span><span class="style">Style 324287 · 69 LĐ</span>
+    </div>
+    <div class="hdr-div"></div>
+    <div class="hdr-fields">
+      <div class="fld"><span class="k">Nhu cầu / Demand</span><span class="v demand mono">PL-26-324287-AW26-003</span></div>
+      <div class="fld"><span class="k">K.Hàng / Customer</span><span class="v">DESIPRO</span></div>
+      <div class="fld"><span class="k">Rải chuyền / First day</span><span class="v mono">29-5</span></div>
+      <div class="fld"><span class="k">Lao động / Workers</span><span class="v mono">69</span></div>
+      <div class="fld"><span class="k">Hàng tồn / WIP</span><span class="v mono">230</span></div>
+    </div>
+    <div class="hdr-clock">
+      <span class="date">Thứ Hai · 02-6-2026</span>
+      <span class="time" id="clock">13:02</span>
+    </div>
+  </div>
+
+  <!-- BODY -->
+  <div class="body">
+
+    <!-- KPI row -->
+    <div class="kpis">
+      <div class="card kp">
+        <div class="k-head"><div class="k-k">Tỉ lệ kiểm lại Đạt/Lỗi</div><div class="k-en">Re-inspect: pass / defect</div></div>
+        <div class="k-mid"><span class="k-big c-pass">100%</span><span class="k-chip pct-chip fill-pass">ĐẠT</span></div>
+      </div>
+      <div class="card kp">
+        <div class="k-head"><div class="k-k">Tổng lỗi 2H</div><div class="k-en">Total defects (last 2H)</div></div>
+        <div class="k-mid"><span class="k-big c-fail">2</span><span class="k-chip pct-chip fill-fail">LỖI</span></div>
+      </div>
+      <div class="card kp">
+        <div class="k-head"><div class="k-k">Kiểm lại đạt 2H</div><div class="k-en">Re-inspect PASS (last 2H)</div></div>
+        <div class="k-mid"><span class="k-big c-pass">2</span><span class="k-chip pct-chip fill-pass">ĐẠT</span></div>
+      </div>
+      <div class="card kp">
+        <div class="k-head"><div class="k-k">Tổng lỗi – Lũy kế ngày</div><div class="k-en">Total defects (accumulate)</div></div>
+        <div class="k-mid"><span class="k-big c-fail">3</span><span class="k-chip pct-chip fill-fail">LỖI</span></div>
+      </div>
+    </div>
+
+    <!-- Main -->
+    <div class="main">
+      <!-- Quality -->
+      <div class="card qcard">
+        <div class="panel-title">Chất lượng cuối chuyền <span class="pt-en">Endline Quality · lỗi & hành động khắc phục</span></div>
+        <div class="q-body">
+          <div class="dwrap">
+            <table class="dtbl">
+              <thead>
+                <tr>
+                  <th style="width:42%;">Loại lỗi<span class="en">Type of defect</span></th>
+                  <th>Vị trí<span class="en">Station</span></th>
+                  <th>SL<span class="en">Number</span></th>
+                  <th style="width:30%;">HĐKP<span class="en">CAP</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="code">S3. Chúi / sole / lệch</td>
+                  <td>Trạm 0</td>
+                  <td class="qty">2</td>
+                  <td class="cap">Tăng cường kiểm tra trạm Tra tay</td>
+                </tr>
+                <tr>
+                  <td class="code">T6. Seam dộp / Có bọt khí</td>
+                  <td>Trạm 5</td>
+                  <td class="qty">1</td>
+                  <td class="cap">Điều chỉnh nhiệt máy ép</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="top3">
+            <div class="top3-t">Top dạng lỗi<br>(lũy kế ngày)</div>
+            <div class="mbars">
+              <div class="mbw">
+                <div class="mbar" style="height:150px;">2</div>
+                <div class="mbl">S3.<br>Chúi/sole/lệch</div>
+              </div>
+              <div class="mbw">
+                <div class="mbar" style="height:75px; opacity:.88;">1</div>
+                <div class="mbl">T6.<br>Seam dộp</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="q-foot">
+          <div class="qf"><span class="l">Đã kiểm cuối chuyền (ngày)</span><span class="v">80 <span style="font-size:12px;color:var(--ink-3)">pcs</span></span></div>
+          <div class="qf"><span class="l">Đạt</span><span class="v pass">77</span></div>
+          <div class="qf"><span class="l">Lỗi</span><span class="v fail">3</span></div>
+          <div class="qf" style="margin-left:auto;"><span class="l">Tỷ lệ lỗi · Defect rate</span><span class="v pass">3.8% <span style="font-size:12px;color:var(--ink-3)">≤ 5%</span></span></div>
+        </div>
+      </div>
+
+      <!-- Breakdown -->
+      <div class="card bcard">
+        <div class="panel-title danger">Máy hỏng <span class="pt-en">Machine breakdown</span></div>
+        <div class="empty">
+          <div class="empty-ic">✓</div>
+          <div class="empty-t">Không có sự cố máy</div>
+          <div class="empty-s">No machine breakdown reported today</div>
+        </div>
+        <div class="b-foot">
+          <div class="b-cell"><div class="l">Số sự cố hôm nay</div><div class="v">0</div></div>
+          <div class="b-cell"><div class="l">Thời gian dừng máy</div><div class="v">0′</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="ftr">
+    <span class="l"><span class="refresh-dot"></span>Cập nhật 13:02 · Tự làm mới mỗi 1 phút</span>
+    <span class="r">TV-3 · Chất lượng cuối chuyền & Máy hỏng</span>
+  </div>
+
+</div>
+</div>
+</div>
+
+<script>
+  function fit() { const s=document.getElementById('stage'); s.style.transform='scale('+Math.min(innerWidth/1920,innerHeight/1080)+')'; }
+  fit(); addEventListener('resize', fit);
+  function tick(){ const d=new Date(); const el=document.getElementById('clock'); if(el) el.textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+  tick(); setInterval(tick,15000);
+</script>
+</body>
+</html>

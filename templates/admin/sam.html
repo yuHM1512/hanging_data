@@ -1,0 +1,122 @@
+{% extends "admin/base.html" %}
+{% set active = 'sam' %}
+{% block heading %}SAM theo mã hàng{% endblock %}
+{% block subheading %}Đồng bộ SAM (phút/SP) từ Google Sheet · cột <code>SAM_OWE</code> · factory <strong>MARCH 29</strong>.{% endblock %}
+
+{% block body %}
+<div class="panel">
+  <h3 class="panel-title">Đồng bộ từ Google Sheet</h3>
+  <p class="muted">URL: <code>SAM/SOT Config · MARCH 29 (Me Nhu + Duy Trung)</code></p>
+  <div class="row-flex">
+    <button class="btn btn-primary" id="btn-sync">Đồng bộ ngay</button>
+    <span class="muted small" id="sync-status">Chưa đồng bộ lần nào.</span>
+  </div>
+</div>
+
+<div class="panel">
+  <h3 class="panel-title">Danh sách SAM</h3>
+  <div class="row-flex">
+    <input type="text" id="filter-sam" placeholder="🔍 Lọc theo StyleNo" class="search-input" />
+    <span class="muted small" id="sam-count"></span>
+  </div>
+  <table class="data-table" id="tbl-sam">
+    <thead>
+      <tr>
+        <th>StyleNo</th>
+        <th>SAM (phút)</th>
+        <th>OWE Target</th>
+        <th>Nguồn</th>
+        <th>Cập nhật lúc</th>
+        <th class="col-action">Hành động</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td colspan="6" class="muted">Đang tải...</td></tr>
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block page_scripts %}
+<script>
+const API = '/admin/api/sam';
+let allRows = [];
+
+function render(rows) {
+  const tbody = document.querySelector('#tbl-sam tbody');
+  document.querySelector('#sam-count').textContent =
+    `Hiển thị ${rows.length} / ${allRows.length} mã.`;
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="muted">Chưa có dữ liệu — bấm "Đồng bộ ngay".</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => {
+    const tgt = r.OWE_Target != null
+      ? `${(r.OWE_Target * 100).toFixed(0)}%`
+      : '<span class="muted">—</span>';
+    return `
+    <tr>
+      <td><strong>${Admin.escape(r.StyleNo)}</strong></td>
+      <td>${r.SAM}</td>
+      <td>${tgt}</td>
+      <td class="muted small">${Admin.escape(r.Source || '')}</td>
+      <td class="muted">${r.UpdatedAt || ''}</td>
+      <td class="col-action">
+        <button class="btn btn-danger btn-sm" data-del="${Admin.escape(r.StyleNo)}">Xoá</button>
+      </td>
+    </tr>
+  `;}).join('');
+}
+
+function applyFilter() {
+  const q = document.querySelector('#filter-sam').value.trim().toLowerCase();
+  const filtered = !q ? allRows :
+    allRows.filter(r => (r.StyleNo || '').toLowerCase().includes(q));
+  render(filtered);
+}
+
+async function load() {
+  allRows = await Admin.fetchJSON(API);
+  applyFilter();
+}
+
+document.querySelector('#btn-sync').addEventListener('click', async (e) => {
+  e.target.disabled = true;
+  e.target.textContent = 'Đang đồng bộ...';
+  try {
+    const r = await Admin.fetchJSON(`${API}/sync`, { method: 'POST' });
+    Admin.toast(
+      `Đồng bộ xong: +${r.inserted} mới, ${r.updated} cập nhật, ${r.skipped} không đổi.`,
+      'ok'
+    );
+    document.querySelector('#sync-status').textContent =
+      `Lần gần nhất: ${r.synced_at} · +${r.inserted} / ↻${r.updated} / =${r.skipped}` +
+      (r.invalid_count ? ` · ⚠ ${r.invalid_count} dòng lỗi (bỏ qua)` : '');
+    load();
+  } catch (err) {
+    Admin.toast(err.message, 'error');
+  } finally {
+    e.target.disabled = false;
+    e.target.textContent = 'Đồng bộ ngay';
+  }
+});
+
+document.querySelector('#filter-sam').addEventListener('input', applyFilter);
+
+document.querySelector('#tbl-sam').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-del]');
+  if (!btn) return;
+  const k = btn.dataset.del;
+  if (!confirm(`Xoá SAM của mã "${k}"?`)) return;
+  try {
+    await Admin.fetchJSON(`${API}/${encodeURIComponent(k)}`, { method: 'DELETE' });
+    Admin.toast('Đã xoá.', 'ok');
+    load();
+  } catch (err) {
+    Admin.toast(err.message, 'error');
+  }
+});
+
+load();
+</script>
+{% endblock %}

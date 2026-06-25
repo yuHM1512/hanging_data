@@ -1,0 +1,875 @@
+"""Admin router for setup and master-data CRUD."""
+from __future__ import annotations
+
+import csv
+import io
+import math
+import re
+import urllib.request
+import uuid
+from datetime import date, datetime, timedelta
+from pathlib import Path
+from typing import Any, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel, ConfigDict, Field
+
+from . import auth, db
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+router = APIRouter(
+    prefix="/admin",
+    tags=["admin"],
+    dependencies=[Depends(auth.require_admin)],
+)
+
+# Tạm: dùng admin cho audit cols. Sau này thay bằng session/JWT.
+
+
+class AdminModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+
+def _actor_id(user: dict) -> str:
+    return str(user.get("UserID") or "admin")
+
+# Chỉ hiện MONo có scan đầu tiên (MIN ShtDate) từ ngày này trở đi.
+PLAN_CANDIDATE_START_DATE = date(2026, 4, 18)
+
+# Regex parse Tổ từ MONo prefix (handle 'LINE 1 #', 'LINE; 1- #', 'LINE; 6-#')
+_RE_LINE_NUM = re.compile(r"LINE\W*?(\d+)", re.IGNORECASE)
+_RE_LEAD_DIGITS = re.compile(r"(\d+)")
+
+
+def parse_mono(mono: str) -> dict[str, Any]:
+    """Tách MONo -> {LineNo, SoDonHang, StyleNo}."""
+    if not mono:
+        return {"LineNo": None, "SoDonHang": None, "StyleNo": None}
+    m_line = _RE_LINE_NUM.search(mono)
+    line_no = int(m_line.group(1)) if m_line else None
+    so_dh = mono[mono.index("#"):] if "#" in mono else None
+    style = None
+    if so_dh:
+        m_st = _RE_LEAD_DIGITS.match(so_dh.lstrip("#"))
+        style = m_st.group(1) if m_st else None
+    return {"LineNo": line_no, "SoDonHang": so_dh, "StyleNo": style}
+
+
+def get_holidays() -> set[date]:
+    rows = db.query("SELECT HolidayDate FROM app.tHoliday")
+    return {r["HolidayDate"] for r in rows}
+
+
+def compute_end_date(
+    first_hang: Optional[date],
+    slkh: Optional[int],
+    daily_aim: Optional[int],
+    holidays: set[date],
+) -> Optional[date]:
+    """Ngày kết thúc dự kiến = FirstHangDate + ceil(SLKH/DailyAim), skip CN + lễ."""
+    if not first_hang or not slkh or not daily_aim or daily_aim <= 0:
+        return None
+    days_needed = math.ceil(slkh / daily_aim)
+    d = first_hang
+    remaining = days_needed
+    # Sun = weekday() == 6
+    while remaining > 0:
+        if d.weekday() != 6 and d not in holidays:
+            remaining -= 1
+            if remaining == 0:
+                return d
+        d += timedelta(days=1)
+    return d
+
+
+# ============================================================
+# Pages
+# ============================================================
+@router.get("")
+@router.get("/")
+def admin_home(request: Request):
+    return templates.TemplateResponse(
+        "admin/home.html", {"request": request, "user": request.state.current_user}
+    )
+
+
+@router.get("/holiday")
+def page_holiday(request: Request):
+    return templates.TemplateResponse(
+        "admin/holiday.html", {"request": request, "user": request.state.current_user}
+    )
+
+
+@router.get("/demand")
+def page_demand(request: Request):
+    return templates.TemplateResponse(
+        "admin/demand.html", {"request": request, "user": request.state.current_user}
+    )
+
+
+@router.get("/sam")
+def page_sam(request: Request):
+    return templates.TemplateResponse(
+        "admin/sam.html", {"request": request, "user": request.state.current_user}
+    )
+
+
+@router.get("/user")
+def page_user(request: Request):
+    return templates.TemplateResponse(
+        "admin/user.html", {"request": request, "user": request.state.current_user}
+    )
+
+
+@router.get("/plan")
+def page_plan(request: Request):
+    return templates.TemplateResponse(
+        "admin/plan.html", {"request": request, "user": request.state.current_user}
+    )
+
+
+# ============================================================
+# M1 — Holiday
+# ============================================================
+class HolidayIn(AdminModel):
+    holiday_date: date = Field(..., alias="HolidayDate")
+    description: Optional[str] = Field(None, alias="Description")
+
+@router.get("/api/holiday")
+def api_holiday_list():
+    return db.query(
+        "SELECT CONVERT(varchar(10), HolidayDate, 120) AS HolidayDate, "
+        "Description, CreatedBy, "
+        "CONVERT(varchar(19), CreatedAt, 120) AS CreatedAt "
+        "FROM app.tHoliday ORDER BY HolidayDate"
+    )
+
+
+@router.post("/api/holiday")
+def api_holiday_create(body: HolidayIn, user: dict = Depends(auth.require_admin)):
+    try:
+        with db.get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO app.tHoliday (HolidayDate, Description, CreatedBy) "
+                "VALUES (?, ?, ?)",
+                (body.holiday_date, body.description, _actor_id(user)),
+            )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"Lưu thất bại: {exc}") from exc
+    return {"ok": True}
+
+
+@router.delete("/api/holiday/{holiday_date}")
+def api_holiday_delete(holiday_date: date):
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM app.tHoliday WHERE HolidayDate = ?", (holiday_date,))
+        n = cur.rowcount
+    if n == 0:
+        raise HTTPException(404, "Không tìm thấy ngày")
+    return {"ok": True, "deleted": n}
+
+
+# ============================================================
+# M2 — DemandRoot (Nhu cầu mẹ)
+# ============================================================
+@router.get("/api/demand/candidates")
+def api_demand_candidates():
+    """Trả về các NhuCauCon (tPlanMaster) chưa được gán làm NhuCauMe.
+
+    User pick từ list này → tự lấy StyleNo + LineNo + lấy NhuCauMe = SoDonHang.
+    """
+    sql = """
+        SELECT pm.SoDonHang, pm.StyleNo, pm.[LineNo] AS LineNoOut,
+               pm.MONo, pm.SLKH, pm.DailyAim, pm.Customer,
+               CONVERT(varchar(10), pm.FirstHangDate, 120) AS FirstHangDate
+        FROM app.tPlanMaster pm
+        WHERE NOT EXISTS (
+            SELECT 1 FROM app.tDemandRoot dr WHERE dr.NhuCauMe = pm.SoDonHang
+        )
+        ORDER BY pm.FirstHangDate, pm.[LineNo], pm.SoDonHang
+    """
+    return db.query(sql)
+
+
+@router.get("/api/demand")
+def api_demand_list():
+    return db.query(
+        "SELECT NhuCauMe, StyleNo, SLKH, ChildCount, DMKT, PhanLoaiDH, "
+        "[LineNo] AS LineNoOut, LDBienChe, Notes, CreatedBy, "
+        "CONVERT(varchar(10), EarliestFirstHangDate, 120) AS EarliestFirstHangDate, "
+        "CONVERT(varchar(19), CreatedAt, 120) AS CreatedAt, "
+        "CONVERT(varchar(19), UpdatedAt, 120) AS UpdatedAt "
+        "FROM app.vDemandRoot ORDER BY StyleNo, NhuCauMe"
+    )
+
+
+class DemandIn(AdminModel):
+    """Form NhuCauMe: chỉ cần pick 1 NhuCauCon + 3 trường nghiệp vụ.
+
+    StyleNo + LineNo sẽ auto-derive từ NhuCauCon được pick (cùng tổ).
+    """
+    nhu_cau_me: str = Field(..., alias="NhuCauMe")  # = SoDonHang của con đầu
+    dmkt: float = Field(..., alias="DMKT", gt=0)
+    phan_loai: str = Field(..., alias="PhanLoaiDH")
+    ld_bien_che: int = Field(..., alias="LDBienChe", gt=0)
+    notes: Optional[str] = Field(None, alias="Notes")
+
+@router.post("/api/demand")
+def api_demand_create(body: DemandIn, user: dict = Depends(auth.require_admin)):
+    if body.phan_loai not in ("Đặc biệt", "Mới", "Lặp lại", "Vest"):
+        raise HTTPException(400, "Phân loại không hợp lệ")
+
+    # Auto-derive StyleNo + LineNo từ NhuCauCon
+    child = db.query(
+        "SELECT TOP 1 PlanMaster_guid, StyleNo, [LineNo] AS LineNoOut "
+        "FROM app.tPlanMaster WHERE SoDonHang = ?",
+        (body.nhu_cau_me,),
+    )
+    if not child:
+        raise HTTPException(
+            400, f"Không tìm thấy NhuCauCon `{body.nhu_cau_me}`. Tạo NhuCauCon trước."
+        )
+    c = child[0]
+
+    try:
+        with db.get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO app.tDemandRoot "
+                "(NhuCauMe, StyleNo, DMKT, PhanLoaiDH, [LineNo], "
+                "LDBienChe, Notes, CreatedBy) "
+                "VALUES (?,?,?,?,?,?,?,?)",
+                (body.nhu_cau_me, c["StyleNo"], body.dmkt, body.phan_loai,
+                 c["LineNoOut"], body.ld_bien_che, body.notes, _actor_id(user)),
+            )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"Lưu thất bại: {exc}") from exc
+    # KHÔNG auto-link — user sẽ vào /admin/plan → Sửa → chọn NhuCauMe từ dropdown
+    return {"ok": True}
+
+
+class DemandUpdate(AdminModel):
+    dmkt: float = Field(..., alias="DMKT", gt=0)
+    phan_loai: str = Field(..., alias="PhanLoaiDH")
+    ld_bien_che: int = Field(..., alias="LDBienChe", gt=0)
+    notes: Optional[str] = Field(None, alias="Notes")
+
+@router.put("/api/demand/{nhu_cau_me}")
+def api_demand_update(nhu_cau_me: str, body: DemandUpdate, user: dict = Depends(auth.require_admin)):
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE app.tDemandRoot SET "
+            "DMKT = ?, PhanLoaiDH = ?, LDBienChe = ?, Notes = ?, "
+            "UpdatedAt = SYSDATETIME(), UpdatedBy = ? "
+            "WHERE NhuCauMe = ?",
+            (body.dmkt, body.phan_loai, body.ld_bien_che, body.notes,
+             _actor_id(user), nhu_cau_me),
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Không tìm thấy Nhu cầu mẹ")
+    return {"ok": True}
+
+
+@router.delete("/api/demand/{nhu_cau_me}")
+def api_demand_delete(nhu_cau_me: str, user: dict = Depends(auth.require_admin)):
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        # Bỏ link FK trên con trước khi xoá mẹ
+        cur.execute(
+            "UPDATE app.tPlanMaster SET NhuCauMe = NULL, "
+            "UpdatedAt = SYSDATETIME(), UpdatedBy = ? "
+            "WHERE NhuCauMe = ?",
+            (_actor_id(user), nhu_cau_me),
+        )
+        cur.execute("DELETE FROM app.tDemandRoot WHERE NhuCauMe = ?", (nhu_cau_me,))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Không tìm thấy Nhu cầu mẹ")
+    return {"ok": True}
+
+
+# ============================================================
+# M5 — Plan (Nhu cầu con) — tPlanMaster + tPlanPO
+# ============================================================
+@router.get("/api/plan/candidates")
+def api_plan_candidates():
+    """List MONo từ dbo.tMOM chưa có trong tPlanMaster, kèm 2 điều kiện lọc.
+
+    1. MIN(ShtDate) trong tRecentWork >= PLAN_CANDIDATE_START_DATE
+    2. Có sản lượng ra chuyền > 0 (SUM(Qty) WHERE StRole=13 AND IsLastSeq=1)
+    """
+    rows = db.query(
+        "SELECT mm.MONo FROM dbo.tMOM mm "
+        "WHERE NOT EXISTS (SELECT 1 FROM app.tPlanMaster pm WHERE pm.MONo = mm.MONo) "
+        "  AND mm.MONo IN ("
+        "      SELECT rw.MONo "
+        "      FROM dbo.tRecentWork rw "
+        "      INNER JOIN dbo.tStation st ON rw.Station_guid = st.guid "
+        "      WHERE rw.MONo IS NOT NULL AND rw.MONo <> '' "
+        "      GROUP BY rw.MONo "
+        "      HAVING MIN(rw.ShtDate) >= ? "
+        "         AND SUM(CASE WHEN st.StRole = 13 AND rw.IsLastSeq = 1 THEN rw.Qty ELSE 0 END) > 0"
+        "  ) "
+        "ORDER BY mm.MONo",
+        (PLAN_CANDIDATE_START_DATE,),
+    )
+    out = []
+    for r in rows:
+        mono = r["MONo"]
+        parts = parse_mono(mono)
+        if parts["SoDonHang"] and parts["LineNo"] and parts["StyleNo"]:
+            out.append({"MONo": mono, **parts})
+    return out
+
+
+class POIn(AdminModel):
+    po_no: str = Field(..., alias="PONo")
+    qty: int = Field(..., alias="Qty", gt=0)
+    ship_date: date = Field(..., alias="ShipDate")
+    notes: Optional[str] = Field(None, alias="Notes")
+
+class PlanIn(AdminModel):
+    mono: str = Field(..., alias="MONo")
+    so_don_hang: str = Field(..., alias="SoDonHang")
+    style_no: str = Field(..., alias="StyleNo")
+    line_no: int = Field(..., alias="LineNo", ge=1, le=10)
+    first_hang_date: date = Field(..., alias="FirstHangDate")
+    slkh: int = Field(..., alias="SLKH", gt=0)
+    daily_aim: Optional[int] = Field(None, alias="DailyAim", gt=0)
+    customer: Optional[str] = Field(None, alias="Customer")
+    nhu_cau_me: Optional[str] = Field(None, alias="NhuCauMe")
+    notes: Optional[str] = Field(None, alias="Notes")
+    pos: list[POIn] = Field(default_factory=list, alias="POs")
+
+def _enrich_plan_rows(rows: list[dict]) -> list[dict]:
+    """Thêm EndDateExpected (computed) + PO count cho mỗi plan."""
+    if not rows:
+        return rows
+    holidays = get_holidays()
+    guids = [r["PlanMaster_guid"] for r in rows]
+    # Đếm PO + sum Qty per plan (1 query)
+    placeholders = ",".join(["?"] * len(guids))
+    po_rows = db.query(
+        f"SELECT PlanMaster_guid, COUNT(*) AS POCount, SUM(Qty) AS POQtySum "
+        f"FROM app.tPlanPO WHERE PlanMaster_guid IN ({placeholders}) "
+        f"GROUP BY PlanMaster_guid",
+        guids,
+    )
+    po_map = {r["PlanMaster_guid"]: r for r in po_rows}
+    for r in rows:
+        po = po_map.get(r["PlanMaster_guid"], {})
+        r["POCount"] = po.get("POCount", 0)
+        r["POQtySum"] = int(po.get("POQtySum") or 0)
+        end = compute_end_date(r["FirstHangDate"], r["SLKH"], r["DailyAim"], holidays)
+        r["EndDateExpected"] = end.isoformat() if end else None
+        # Stringify date for JSON
+        r["FirstHangDate"] = r["FirstHangDate"].isoformat() if r["FirstHangDate"] else None
+        # Stringify guid
+        r["PlanMaster_guid"] = str(r["PlanMaster_guid"])
+    return rows
+
+
+@router.get("/api/plan")
+def api_plan_list():
+    rows = db.query(
+        "SELECT PlanMaster_guid, MONo, SoDonHang, StyleNo, [LineNo] AS LineNoOut, "
+        "FirstHangDate, SLKH, DailyAim, Customer, NhuCauMe, Notes, "
+        "CreatedBy, "
+        "CONVERT(varchar(19), CreatedAt, 120) AS CreatedAt "
+        "FROM app.tPlanMaster ORDER BY FirstHangDate DESC, [LineNo], SoDonHang"
+    )
+    return _enrich_plan_rows(rows)
+
+
+@router.get("/api/plan/{guid}")
+def api_plan_detail(guid: str):
+    rows = db.query(
+        "SELECT PlanMaster_guid, MONo, SoDonHang, StyleNo, [LineNo] AS LineNoOut, "
+        "FirstHangDate, SLKH, DailyAim, Customer, NhuCauMe, Notes "
+        "FROM app.tPlanMaster WHERE PlanMaster_guid = ?",
+        (guid,),
+    )
+    if not rows:
+        raise HTTPException(404, "Plan không tồn tại")
+    plan = _enrich_plan_rows(rows)[0]
+    plan["POs"] = db.query(
+        "SELECT PlanPO_guid, PONo, Qty, "
+        "CONVERT(varchar(10), ShipDate, 120) AS ShipDate, Notes "
+        "FROM app.tPlanPO WHERE PlanMaster_guid = ? ORDER BY ShipDate, PONo",
+        (guid,),
+    )
+    return plan
+
+
+@router.post("/api/plan")
+def api_plan_create(body: PlanIn, user: dict = Depends(auth.require_admin)):
+    new_guid = uuid.uuid4()
+    try:
+        with db.get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO app.tPlanMaster "
+                "(PlanMaster_guid, MONo, SoDonHang, StyleNo, [LineNo], "
+                "FirstHangDate, SLKH, DailyAim, Customer, NhuCauMe, Notes, CreatedBy) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                (new_guid, body.mono, body.so_don_hang, body.style_no, body.line_no,
+                 body.first_hang_date, body.slkh, body.daily_aim, body.customer,
+                 body.nhu_cau_me, body.notes, _actor_id(user)),
+            )
+            for po in body.pos:
+                cur.execute(
+                    "INSERT INTO app.tPlanPO (PlanMaster_guid, PONo, Qty, ShipDate, "
+                    "Notes, CreatedBy) VALUES (?,?,?,?,?,?)",
+                    (new_guid, po.po_no, po.qty, po.ship_date, po.notes, _actor_id(user)),
+                )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"Lưu thất bại: {exc}") from exc
+    return {"ok": True, "guid": str(new_guid)}
+
+
+class PlanUpdate(AdminModel):
+    line_no: int = Field(..., alias="LineNo", ge=1, le=10)
+    first_hang_date: date = Field(..., alias="FirstHangDate")
+    slkh: int = Field(..., alias="SLKH", gt=0)
+    daily_aim: Optional[int] = Field(None, alias="DailyAim", gt=0)
+    customer: Optional[str] = Field(None, alias="Customer")
+    nhu_cau_me: Optional[str] = Field(None, alias="NhuCauMe")
+    notes: Optional[str] = Field(None, alias="Notes")
+
+@router.put("/api/plan/{guid}")
+def api_plan_update(guid: str, body: PlanUpdate, user: dict = Depends(auth.require_admin)):
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE app.tPlanMaster SET "
+            "[LineNo] = ?, FirstHangDate = ?, SLKH = ?, DailyAim = ?, "
+            "Customer = ?, NhuCauMe = ?, Notes = ?, "
+            "UpdatedAt = SYSDATETIME(), UpdatedBy = ? "
+            "WHERE PlanMaster_guid = ?",
+            (body.line_no, body.first_hang_date, body.slkh, body.daily_aim,
+             body.customer, body.nhu_cau_me, body.notes, _actor_id(user), guid),
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Plan không tồn tại")
+    return {"ok": True}
+
+
+@router.delete("/api/plan/{guid}")
+def api_plan_delete(guid: str):
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        # tPlanPO có ON DELETE CASCADE → tự xoá theo
+        cur.execute("DELETE FROM app.tPlanMaster WHERE PlanMaster_guid = ?", (guid,))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Plan không tồn tại")
+    return {"ok": True}
+
+
+@router.post("/api/plan/{guid}/po")
+def api_po_add(guid: str, body: POIn, user: dict = Depends(auth.require_admin)):
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO app.tPlanPO (PlanMaster_guid, PONo, Qty, ShipDate, "
+            "Notes, CreatedBy) VALUES (?,?,?,?,?,?)",
+            (guid, body.po_no, body.qty, body.ship_date, body.notes, _actor_id(user)),
+        )
+    return {"ok": True}
+
+
+@router.delete("/api/po/{po_guid}")
+def api_po_delete(po_guid: str):
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM app.tPlanPO WHERE PlanPO_guid = ?", (po_guid,))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "PO không tồn tại")
+    return {"ok": True}
+
+
+# ============================================================
+# M6 — Cluster station config (6 trạm cho TV-2 + WIP)
+# ============================================================
+@router.get("/cluster")
+def page_cluster(request: Request):
+    return templates.TemplateResponse(
+        "admin/cluster.html", {"request": request, "user": request.state.current_user}
+    )
+
+
+_CLUSTER_GROUP_SQL = """
+    ;WITH Steps AS (
+      SELECT ds.Odr, ds.SeqNo, ds.IsCombine, sd.SeqName,
+             MAX(CASE WHEN ds.IsCombine = 0 THEN ds.Odr END)
+               OVER (ORDER BY ds.Odr ROWS UNBOUNDED PRECEDING) AS HeadOdr,
+             rm.guid AS RouteM_guid
+      FROM dbo.tRouteDS ds
+      JOIN dbo.tRouteM rm ON ds.RouteM_guid = rm.guid
+      JOIN dbo.tMOM mm ON rm.MOM_guid = mm.guid
+      LEFT JOIN dbo.tMOSeqM sm ON sm.MOM_guid = mm.guid
+      LEFT JOIN dbo.tMOSeqD sd ON sd.MOSeqM_guid = sm.guid AND sd.SeqNo = ds.SeqNo
+      WHERE mm.MONo = ?
+    ),
+    Groups AS (
+      SELECT HeadOdr,
+             COUNT(*) AS StepCount,
+             STRING_AGG(CAST(SeqNo AS varchar(10)), '+')
+               WITHIN GROUP (ORDER BY Odr) AS SeqNoList,
+             STRING_AGG(SeqName, ' + ')
+               WITHIN GROUP (ORDER BY Odr) AS GroupLabel,
+             MIN(RouteM_guid) AS RouteM_guid
+      FROM Steps
+      GROUP BY HeadOdr
+    )
+    SELECT g.HeadOdr AS RouteStepOdr,
+           g.GroupLabel,
+           g.SeqNoList,
+           g.StepCount,
+           ISNULL((
+             SELECT STRING_AGG(CAST(st.StNo AS varchar(10)), ',')
+                    WITHIN GROUP (ORDER BY st.StNo)
+             FROM dbo.tRouteDT dt
+             JOIN dbo.tStation st ON dt.Station_guid = st.guid
+             WHERE dt.RouteM_guid = g.RouteM_guid
+               AND dt.SeqNo IN (
+                 SELECT SeqNo FROM Steps WHERE HeadOdr = g.HeadOdr
+               )
+           ), '') AS StationNos
+    FROM Groups g
+    ORDER BY g.HeadOdr;
+"""
+
+
+def _resolve_canonical_mono(nhu_cau_me: str) -> Optional[str]:
+    """NhuCauMe = SoDonHang con đầu → lookup MONo của con đó."""
+    rows = db.query(
+        "SELECT TOP 1 MONo FROM app.tPlanMaster WHERE SoDonHang = ?",
+        (nhu_cau_me,),
+    )
+    return rows[0]["MONo"] if rows else None
+
+
+@router.get("/api/cluster/list")
+def api_cluster_list():
+    """List NhuCauMe + trạng thái cluster config."""
+    return db.query(
+        """
+        SELECT dr.NhuCauMe, dr.StyleNo, dr.[LineNo] AS LineNoOut,
+               (SELECT COUNT(*) FROM app.tClusterStationConfig c
+                WHERE c.NhuCauMe = dr.NhuCauMe) AS ClusterCount
+        FROM app.tDemandRoot dr
+        ORDER BY dr.[LineNo], dr.NhuCauMe
+        """
+    )
+
+
+@router.get("/api/cluster/groups/{nhu_cau_me:path}")
+def api_cluster_groups(nhu_cau_me: str):
+    mono = _resolve_canonical_mono(nhu_cau_me)
+    if not mono:
+        raise HTTPException(404, f"Không tìm thấy NhuCauCon '{nhu_cau_me}'")
+    return {
+        "MONo": mono,
+        "Groups": db.query(_CLUSTER_GROUP_SQL, (mono,)),
+    }
+
+
+@router.get("/api/cluster/{nhu_cau_me:path}")
+def api_cluster_get(nhu_cau_me: str):
+    return db.query(
+        "SELECT Cluster_guid, ClusterOrder, RouteStepOdr, GroupLabel, Role "
+        "FROM app.tClusterStationConfig WHERE NhuCauMe = ? "
+        "ORDER BY ClusterOrder",
+        (nhu_cau_me,),
+    )
+
+
+class ClusterPick(AdminModel):
+    cluster_order: int = Field(..., alias="ClusterOrder", ge=1, le=6)
+    route_step_odr: int = Field(..., alias="RouteStepOdr")
+    group_label: str = Field(..., alias="GroupLabel")
+    role: Optional[str] = Field(None, alias="Role")
+
+class ClusterIn(AdminModel):
+    picks: list[ClusterPick] = Field(..., alias="Picks")
+
+@router.put("/api/cluster/{nhu_cau_me:path}")
+def api_cluster_save(nhu_cau_me: str, body: ClusterIn, user: dict = Depends(auth.require_admin)):
+    """Replace mode: xoá hết config cũ → insert 6 picks mới."""
+    if len(body.picks) != 6:
+        raise HTTPException(400, "Cần đúng 6 cụm (1 first + 4 middle + 1 last)")
+    orders = sorted(p.cluster_order for p in body.picks)
+    if orders != [1, 2, 3, 4, 5, 6]:
+        raise HTTPException(400, "ClusterOrder phải đầy đủ 1..6, mỗi số 1 lần")
+    # First = order 1 phải role='first'; Last = order 6 phải role='last'
+    by_order = {p.cluster_order: p for p in body.picks}
+    if by_order[1].role != "first":
+        raise HTTPException(400, "Cụm order 1 phải có Role='first'")
+    if by_order[6].role != "last":
+        raise HTTPException(400, "Cụm order 6 phải có Role='last'")
+    # Production-order check: RouteStepOdr strictly increasing
+    rs_seq = [by_order[i].route_step_odr for i in range(1, 7)]
+    if rs_seq != sorted(set(rs_seq)) or len(set(rs_seq)) != 6:
+        raise HTTPException(400, "RouteStepOdr phải tăng dần theo thứ tự sản xuất, không trùng")
+
+    # Verify mẹ tồn tại
+    if not db.query(
+        "SELECT 1 FROM app.tDemandRoot WHERE NhuCauMe = ?", (nhu_cau_me,)
+    ):
+        raise HTTPException(404, "NhuCauMe không tồn tại")
+
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "DELETE FROM app.tClusterStationConfig WHERE NhuCauMe = ?",
+            (nhu_cau_me,),
+        )
+        for p in body.picks:
+            cur.execute(
+                "INSERT INTO app.tClusterStationConfig "
+                "(NhuCauMe, ClusterOrder, RouteStepOdr, GroupLabel, Role, CreatedBy) "
+                "VALUES (?,?,?,?,?,?)",
+                (nhu_cau_me, p.cluster_order, p.route_step_odr,
+                 p.group_label, p.role, _actor_id(user)),
+            )
+    return {"ok": True}
+
+
+# ============================================================
+# M4 — SAM (Google Sheet sync + CRUD)
+# ============================================================
+GS_SHEET_ID = "1fWprYtICgdRqKKt0w0szroCFMJ4C_e6QqtQ6o2SOjuc"
+GS_GID = "2070629306"
+GS_URL = (
+    f"https://docs.google.com/spreadsheets/d/{GS_SHEET_ID}"
+    f"/export?format=csv&gid={GS_GID}"
+)
+SAM_FACTORY_KEYWORD = "MARCH 29"
+SAM_COL_STYLE = "CC - CONCEPTION"
+SAM_COL_VALUE = "SAM_OWE"
+SAM_COL_TARGET = "TARGET_OWE"
+SAM_COL_FACTORY = "Factory"
+
+
+@router.get("/api/sam")
+def api_sam_list():
+    return db.query(
+        "SELECT StyleNo, SAM, OWE_Target, Source, "
+        "CONVERT(varchar(19), UpdatedAt, 120) AS UpdatedAt, UpdatedBy "
+        "FROM app.tSAM ORDER BY StyleNo"
+    )
+
+
+class SamIn(AdminModel):
+    style_no: str = Field(..., alias="StyleNo")
+    sam: float = Field(..., alias="SAM", gt=0)
+    source: Optional[str] = Field(None, alias="Source")
+
+@router.put("/api/sam/{style_no}")
+def api_sam_upsert(style_no: str, body: SamIn, user: dict = Depends(auth.require_admin)):
+    """Manual upsert (override). Source ghi rõ là manual."""
+    actor = _actor_id(user)
+    src = body.source or f"Manual override by {actor}"
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            MERGE app.tSAM AS tgt
+            USING (SELECT ? AS StyleNo, ? AS SAM, ? AS Source) AS src
+                  ON tgt.StyleNo = src.StyleNo
+            WHEN MATCHED THEN UPDATE SET SAM = src.SAM, Source = src.Source,
+                                         UpdatedAt = SYSDATETIME(),
+                                         UpdatedBy = ?
+            WHEN NOT MATCHED THEN INSERT (StyleNo, SAM, Source, UpdatedBy)
+                                  VALUES (src.StyleNo, src.SAM, src.Source, ?);
+            """,
+            (style_no, body.sam, src, actor, actor),
+        )
+    return {"ok": True}
+
+
+@router.delete("/api/sam/{style_no}")
+def api_sam_delete(style_no: str):
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM app.tSAM WHERE StyleNo = ?", (style_no,))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Không tìm thấy mã hàng")
+    return {"ok": True}
+
+
+@router.post("/api/sam/sync")
+def api_sam_sync(user: dict = Depends(auth.require_admin)):
+    """Fetch CSV từ Google Sheet → UPSERT app.tSAM theo StyleNo."""
+    try:
+        with urllib.request.urlopen(GS_URL, timeout=30) as resp:
+            raw = resp.read().decode("utf-8")
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            502,
+            f"Không fetch được Google Sheet (kiểm tra share setting): {exc}",
+        ) from exc
+
+    reader = csv.reader(io.StringIO(raw))
+    rows = list(reader)
+    if len(rows) < 3:
+        raise HTTPException(502, "Sheet rỗng hoặc cấu trúc lạ")
+
+    # Row 0 = section labels, Row 1 = header
+    header = rows[1]
+    try:
+        idx_factory = header.index(SAM_COL_FACTORY)
+        idx_style = header.index(SAM_COL_STYLE)
+        idx_sam = header.index(SAM_COL_VALUE)
+        idx_target = header.index(SAM_COL_TARGET)
+    except ValueError as e:
+        raise HTTPException(
+            502, f"Thiếu cột trong Sheet ({e}). Kiểm tra tiêu đề SAM/SOT Config."
+        ) from e
+
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+    src_label = f"Google Sheet · synced {timestamp}"
+
+    inserted = updated = skipped = 0
+    invalid: list[dict] = []
+
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        for r in rows[2:]:
+            if len(r) <= max(idx_sam, idx_target):
+                continue
+            factory = (r[idx_factory] or "").strip()
+            style = (r[idx_style] or "").strip()
+            sam_raw = (r[idx_sam] or "").strip()
+            target_raw = (r[idx_target] or "").strip()
+            if SAM_FACTORY_KEYWORD not in factory or not style or not sam_raw:
+                continue
+            try:
+                sam_val = float(sam_raw.replace(",", "."))
+                if sam_val <= 0:
+                    raise ValueError("SAM <= 0")
+            except ValueError:
+                invalid.append({"StyleNo": style, "raw_sam": sam_raw})
+                continue
+            target_val: Optional[float] = None
+            if target_raw:
+                try:
+                    target_val = float(target_raw.replace(",", "."))
+                    if not (0 < target_val <= 1.5):
+                        target_val = None  # bỏ qua nếu ngoài khoảng hợp lý
+                except ValueError:
+                    target_val = None
+
+            # Check exists
+            cur.execute(
+                "SELECT SAM, OWE_Target FROM app.tSAM WHERE StyleNo = ?", (style,)
+            )
+            row = cur.fetchone()
+            if row is None:
+                cur.execute(
+                    "INSERT INTO app.tSAM (StyleNo, SAM, OWE_Target, Source, UpdatedBy) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (style, sam_val, target_val, src_label, _actor_id(user)),
+                )
+                inserted += 1
+            else:
+                cur_sam = float(row[0])
+                cur_target = float(row[1]) if row[1] is not None else None
+                if cur_sam != sam_val or cur_target != target_val:
+                    cur.execute(
+                        "UPDATE app.tSAM SET SAM = ?, OWE_Target = ?, Source = ?, "
+                        "UpdatedAt = SYSDATETIME(), UpdatedBy = ? WHERE StyleNo = ?",
+                        (sam_val, target_val, src_label, _actor_id(user), style),
+                    )
+                    updated += 1
+                else:
+                    skipped += 1
+
+    return {
+        "ok": True,
+        "inserted": inserted,
+        "updated": updated,
+        "skipped": skipped,
+        "invalid_count": len(invalid),
+        "invalid_samples": invalid[:10],
+        "synced_at": timestamp,
+    }
+
+
+# ============================================================
+# M6 — User (tổ trưởng / admin)
+# ============================================================
+class UserIn(AdminModel):
+    user_id: str = Field(..., alias="UserID", min_length=1, max_length=50)
+    display_name: Optional[str] = Field(None, alias="DisplayName")
+    unit: Optional[str] = Field(None, alias="Unit")
+    dept: Optional[int] = Field(None, alias="Dept", ge=1, le=10)
+    role: str = Field("to_truong", alias="Role")
+
+
+@router.get("/api/user")
+def api_user_list():
+    return db.query(
+        "SELECT UserID, DisplayName, Unit, Dept, Role, "
+        "CONVERT(varchar(19), CreatedAt, 120) AS CreatedAt "
+        "FROM app.tUser ORDER BY Dept, UserID"
+    )
+
+
+@router.post("/api/user")
+def api_user_create(body: UserIn):
+    try:
+        with db.get_conn() as conn:
+            cur = conn.cursor()
+            # IsActive bỏ trống → DB DEFAULT 1 (DF_tUser_IsActive)
+            cur.execute(
+                "INSERT INTO app.tUser "
+                "(UserID, DisplayName, Unit, Dept, Role) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (body.user_id, body.display_name, body.unit,
+                 body.dept, body.role),
+            )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"Lưu thất bại: {exc}") from exc
+    return {"ok": True}
+
+
+class UserUpdate(AdminModel):
+    display_name: Optional[str] = Field(None, alias="DisplayName")
+    unit: Optional[str] = Field(None, alias="Unit")
+    dept: Optional[int] = Field(None, alias="Dept", ge=1, le=10)
+    role: str = Field(..., alias="Role")
+
+
+@router.put("/api/user/{user_id}")
+def api_user_update(user_id: str, body: UserUpdate):
+    # IsActive không cập nhật qua UI — dùng sqlcmd nếu cần deactivate
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE app.tUser SET "
+            "DisplayName = ?, Unit = ?, Dept = ?, Role = ? "
+            "WHERE UserID = ?",
+            (body.display_name, body.unit, body.dept, body.role, user_id),
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(404, "User không tồn tại")
+    return {"ok": True}
+
+
+@router.delete("/api/user/{user_id}")
+def api_user_delete(user_id: str):
+    if user_id == "admin":
+        raise HTTPException(400, "Không thể xoá tài khoản admin")
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM app.tUser WHERE UserID = ?", (user_id,))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "User không tồn tại")
+    return {"ok": True}

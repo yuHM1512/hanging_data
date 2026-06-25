@@ -1,0 +1,171 @@
+{% extends "admin/base.html" %}
+{% set active = 'user' %}
+{% block heading %}Tài khoản{% endblock %}
+{% block subheading %}Tổ trưởng đăng nhập bằng employee code để nhập lỗi / máy hỏng / kiểm lại. <strong>Dept</strong> = số tổ phụ trách (1, 6…).{% endblock %}
+
+{% block body %}
+<div class="panel">
+  <h3 class="panel-title" id="form-title">Thêm tài khoản</h3>
+  <form id="form-user" class="row-form">
+    <input type="hidden" name="_mode" value="create" />
+    <label class="field">
+      <span class="field-label">Employee Code</span>
+      <input type="text" name="UserID" required maxlength="50" placeholder="H3724" />
+    </label>
+    <label class="field flex-grow">
+      <span class="field-label">Họ và tên</span>
+      <input type="text" name="DisplayName" maxlength="100" placeholder="Huy Nguyen" />
+    </label>
+    <label class="field">
+      <span class="field-label">Đơn vị (Unit)</span>
+      <input type="text" name="Unit" maxlength="20" placeholder="XN3" />
+    </label>
+    <label class="field">
+      <span class="field-label">Tổ (Dept)</span>
+      <input type="number" name="Dept" min="1" max="10" placeholder="1" />
+    </label>
+    <label class="field">
+      <span class="field-label">Vai trò</span>
+      <select name="Role">
+        <option value="to_truong">Tổ trưởng</option>
+        <option value="admin">Admin</option>
+      </select>
+    </label>
+    <button class="btn btn-primary" type="submit" id="btn-submit">+ Thêm</button>
+    <button class="btn btn-soft" type="button" id="btn-cancel" style="display:none;">Huỷ sửa</button>
+  </form>
+</div>
+
+<div class="panel">
+  <h3 class="panel-title">Danh sách</h3>
+  <table class="data-table" id="tbl-user">
+    <thead>
+      <tr>
+        <th>Employee Code</th>
+        <th>Họ và tên</th>
+        <th>Đơn vị</th>
+        <th>Tổ</th>
+        <th>Vai trò</th>
+        <th>Tạo lúc</th>
+        <th class="col-action">Hành động</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td colspan="7" class="muted">Đang tải...</td></tr>
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block page_scripts %}
+<script>
+const API = '/admin/api/user';
+const $form = document.querySelector('#form-user');
+const $btnSubmit = document.querySelector('#btn-submit');
+const $btnCancel = document.querySelector('#btn-cancel');
+const $formTitle = document.querySelector('#form-title');
+
+function resetForm() {
+  $form.reset();
+  $form.elements._mode.value = 'create';
+  $form.elements.UserID.disabled = false;
+  $btnSubmit.textContent = '+ Thêm';
+  $btnCancel.style.display = 'none';
+  $formTitle.textContent = 'Thêm tài khoản';
+}
+
+function fillForm(u) {
+  $form.elements._mode.value = 'update';
+  $form.elements.UserID.value = u.UserID;
+  $form.elements.UserID.disabled = true;
+  $form.elements.DisplayName.value = u.DisplayName || '';
+  $form.elements.Unit.value = u.Unit || '';
+  $form.elements.Dept.value = u.Dept ?? '';
+  $form.elements.Role.value = u.Role || 'to_truong';
+  $btnSubmit.textContent = 'Lưu';
+  $btnCancel.style.display = '';
+  $formTitle.textContent = 'Sửa tài khoản: ' + u.UserID;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function load() {
+  const tbody = document.querySelector('#tbl-user tbody');
+  tbody.innerHTML = '<tr><td colspan="7" class="muted">Đang tải...</td></tr>';
+  const rows = await Admin.fetchJSON(API);
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="muted">Chưa có tài khoản.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(u => `
+    <tr>
+      <td><strong>${Admin.escape(u.UserID)}</strong></td>
+      <td>${Admin.escape(u.DisplayName || '')}</td>
+      <td>${Admin.escape(u.Unit || '')}</td>
+      <td>${u.Dept ?? ''}</td>
+      <td>${u.Role === 'admin' ? '<strong>Admin</strong>' : 'Tổ trưởng'}</td>
+      <td class="muted">${u.CreatedAt || ''}</td>
+      <td class="col-action">
+        <button class="btn btn-sm" data-edit='${JSON.stringify(u).replace(/'/g, "&#39;")}'>Sửa</button>
+        ${u.UserID === 'admin' ? '' : `<button class="btn btn-danger btn-sm" data-del="${Admin.escape(u.UserID)}">Xoá</button>`}
+      </td>
+    </tr>
+  `).join('');
+}
+
+$form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const mode = fd.get('_mode');
+  const userId = fd.get('UserID').trim();
+  const body = {
+    UserID: userId,
+    DisplayName: fd.get('DisplayName').trim() || null,
+    Unit: fd.get('Unit').trim() || null,
+    Dept: fd.get('Dept') ? Number(fd.get('Dept')) : null,
+    Role: fd.get('Role'),
+  };
+  try {
+    if (mode === 'create') {
+      await Admin.fetchJSON(API, { method: 'POST', body: JSON.stringify(body) });
+      Admin.toast('Đã thêm.', 'ok');
+    } else {
+      // PUT không cần UserID trong body
+      const { UserID, ...payload } = body;
+      await Admin.fetchJSON(`${API}/${encodeURIComponent(userId)}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      });
+      Admin.toast('Đã cập nhật.', 'ok');
+    }
+    resetForm();
+    load();
+  } catch (err) {
+    Admin.toast(err.message, 'error');
+  }
+});
+
+$btnCancel.addEventListener('click', resetForm);
+
+document.querySelector('#tbl-user').addEventListener('click', async (e) => {
+  const editBtn = e.target.closest('[data-edit]');
+  if (editBtn) {
+    const u = JSON.parse(editBtn.dataset.edit.replace(/&#39;/g, "'"));
+    fillForm(u);
+    return;
+  }
+  const delBtn = e.target.closest('[data-del]');
+  if (!delBtn) return;
+  const uid = delBtn.dataset.del;
+  if (!confirm(`Xoá tài khoản ${uid}?`)) return;
+  try {
+    await Admin.fetchJSON(`${API}/${encodeURIComponent(uid)}`, { method: 'DELETE' });
+    Admin.toast('Đã xoá.', 'ok');
+    load();
+  } catch (err) {
+    Admin.toast(err.message, 'error');
+  }
+});
+
+load();
+</script>
+{% endblock %}

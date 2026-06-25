@@ -1,0 +1,33 @@
+{% extends "admin/base.html" %}
+{% set active = 'home' %}
+{% block heading %}Bảng điều khiển quản trị{% endblock %}
+{% block subheading %}Master data cho dashboard chuyền treo.{% endblock %}
+
+{% block body %}
+<div class="card-grid">
+  <a class="link-card" href="/admin/holiday">
+    <h3>Lịch nghỉ</h3>
+    <p>Ngày lễ + ngày nghỉ riêng. Dùng để tính ngày kết thúc dự kiến.</p>
+  </a>
+  <a class="link-card" href="/admin/plan">
+    <h3>Nhu cầu con</h3>
+    <p>Khai báo kế hoạch con: tổ, mã, ngày lên chuyền, SLKH, PO list.</p>
+  </a>
+  <a class="link-card" href="/admin/demand">
+    <h3>Nhu cầu mẹ</h3>
+    <p>Đăng ký mã hàng + định mức + phân loại + lao động biên chế.</p>
+  </a>
+  <a class="link-card" href="/admin/cluster">
+    <h3>6 cụm theo dõi</h3>
+    <p>Chọn 6 trạm/cụm theo dõi cho TV-2 + công thức WIP. 1 first + 4 middle + 1 KCS.</p>
+  </a>
+  <a class="link-card" href="/admin/sam">
+    <h3>SAM</h3>
+    <p>Đồng bộ thời gian SAM từ Google Sheet · 1 click.</p>
+  </a>
+  <a class="link-card" href="/admin/user">
+    <h3>Tài khoản</h3>
+    <p>Quản lý tài khoản tổ trưởng / admin. Đăng nhập bằng employee code.</p>
+  </a>
+</div>
+{% endblock %}

@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Quản trị · {{ super() }}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="/static/css/admin.css">
+
+<div class="app-shell">
+  <aside class="app-sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-mark"></span>
+      <div>
+        <p class="sidebar-eyebrow">Hanging Conveyor</p>
+        <h1>Admin Setup</h1>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <p class="sidebar-label">Điều hướng</p>
+      <a href="/dashboard" class="sidebar-link">Dashboard</a>
+      <a href="/entry" class="sidebar-link">Nhập liệu tổ trưởng</a>
+      <a href="/tv" class="sidebar-link">TV setup</a>
+    </div>
+
+    <div class="sidebar-section">
+      <p class="sidebar-label">Cấu hình</p>
+      <a href="/admin" class="sidebar-link {% if active == 'home' %}active{% endif %}">Tổng quan</a>
+      <a href="/admin/holiday" class="sidebar-link {% if active == 'holiday' %}active{% endif %}">Lịch nghỉ</a>
+      <a href="/admin/plan" class="sidebar-link {% if active == 'plan' %}active{% endif %}">Nhu cầu con</a>
+      <a href="/admin/demand" class="sidebar-link {% if active == 'demand' %}active{% endif %}">Nhu cầu mẹ</a>
+      <a href="/admin/cluster" class="sidebar-link {% if active == 'cluster' %}active{% endif %}">6 cụm</a>
+      <a href="/admin/sam" class="sidebar-link {% if active == 'sam' %}active{% endif %}">SAM</a>
+      <a href="/admin/user" class="sidebar-link {% if active == 'user' %}active{% endif %}">Tài khoản</a>
+    </div>
+
+    <div class="sidebar-user-card">
+      <div class="user-chip user-chip-block">
+        <span class="user-dot"></span>
+        <div>
+          <strong>{{ user.DisplayName or user.UserID }}</strong>
+          <div class="muted small">{{ user.UserID }} · {{ user.Role }}</div>
+        </div>
+      </div>
+      <button class="btn btn-soft sidebar-logout" id="btn-logout" type="button">Đăng xuất</button>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <header class="admin-hero">
+      <h2 class="admin-title">{% block heading %}{% endblock %}</h2>
+      <p class="admin-sub">{% block subheading %}{% endblock %}</p>
+    </header>
+
+    <section class="admin-section">
+      {% block body %}{% endblock %}
+    </section>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/admin.js?v=20260605d"></script>
+<script>
+  (() => {
+    const btn = document.getElementById('btn-logout');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      try {
+        await Admin.logout('/login');
+      } catch (err) {
+        Admin.toast(err.message || 'Đăng xuất thất bại', 'error');
+      }
+    });
+  })();
+</script>
+{% block page_scripts %}{% endblock %}
+{% endblock %}

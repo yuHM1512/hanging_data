@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>TV-4 · Tiến độ kế hoạch theo ngày</title>
+<link rel="stylesheet" href="/static/css/tv/shared.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  .hdr-line .lk { font-size: 12px; letter-spacing: .12em; opacity: .75; font-weight: 600; }
+  .hdr-line .lv { font-size: 44px; }
+  .hdr-line .style { font-size: 15px; margin-top: 3px; }
+  .fld .k { font-size: 12px; letter-spacing: .05em; color: rgba(255,255,255,.7); font-weight: 600; }
+  .fld .v { font-size: 26px; }
+  .fld .v.demand { font-size: 22px; color: #DDE7F8; }
+  .fld .v.gold { color: #FCD34D; font-family: var(--font-mono); font-size: 30px; }
+  .hdr-clock .date { font-size: 14px; color: rgba(255,255,255,.78); font-weight: 500; }
+  .hdr-fields { gap: var(--s-5); }
+
+  .body { flex: 1; min-height: 0; display: grid; grid-template-rows: auto 1fr; gap: var(--s-5); }
+
+  /* Legend */
+  .legend { display: flex; gap: var(--s-6); align-items: center; padding: var(--s-3) var(--s-5); }
+  .legend .lh { font-size: var(--fs-label); font-weight: 700; color: var(--brand-ink); text-transform: uppercase; letter-spacing: .06em; }
+  .legend .li { display: flex; align-items: center; gap: var(--s-2); font-size: var(--fs-label); color: var(--ink-2); font-weight: 500; }
+  .legend .sw { width: 22px; height: 22px; border-radius: var(--r-sm); }
+  .legend .sw.pass { background: var(--pass-soft); border: 1px solid var(--pass-line); }
+  .legend .sw.fail { background: var(--fail-soft); border: 1px solid var(--fail-line); }
+  .legend .sw.gold { background: #FCD34D; }
+  .legend .sw.future { background: var(--surface-2); border: 1px solid var(--divider); }
+  .legend .sw.current { background: var(--brand-tint); border: 2px solid var(--brand-500); }
+
+  /* Day table */
+  .day-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 12px 12px 14px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  }
+  .day-scroll {
+    flex: 1; min-height: 0;
+    overflow-x: auto; overflow-y: hidden;
+  }
+  .day-scroll::-webkit-scrollbar { height: 14px; }
+  .day-scroll::-webkit-scrollbar-track { background: var(--surface-2); }
+  .day-scroll::-webkit-scrollbar-thumb { background: var(--brand-500); border-radius: 7px; }
+  .day-scroll::-webkit-scrollbar-thumb:hover { background: var(--brand-700); }
+
+  .day-tbl {
+    width: max-content; min-width: 100%;
+    border-collapse: collapse; table-layout: fixed; height: auto;
+  }
+  .day-tbl th, .day-tbl td { min-width: 96px; }
+  .day-tbl th {
+    background: var(--brand-700); color: #fff;
+    padding: 14px 6px; font-size: 22px; font-weight: 700;
+    text-align: center; border-right: 1px solid rgba(255,255,255,.12);
+  }
+  .day-tbl th.rowhead {
+    background: var(--brand-800); text-align: left;
+    padding-left: var(--s-5); width: 240px; min-width: 240px;
+    font-size: 14px;
+    position: sticky; left: 0; z-index: 5;
+  }
+  .day-tbl th.d100 {
+    background: linear-gradient(180deg, #F4CB55, #E0A82E);
+    color: var(--brand-900); position: relative;
+  }
+  .day-tbl th.d100::after {
+    content: "★"; position: absolute; top: 4px; right: 8px; font-size: 14px;
+  }
+  .day-tbl th.current {
+    background: linear-gradient(180deg, var(--brand-500), var(--brand-700));
+    box-shadow: inset 0 -4px 0 #FCD34D;
+  }
+  .day-tbl td {
+    padding: 12px 6px; border: 1px solid rgba(39, 67, 120, 0.08);
+    text-align: center; font-family: var(--font-mono); font-weight: 700; font-size: 26px;
+    vertical-align: middle;
+  }
+  .day-tbl td.rowname {
+    background: var(--brand-soft); color: var(--brand-ink);
+    text-align: left; padding-left: var(--s-5);
+    font-size: 17px; font-family: var(--font-sans); font-weight: 600;
+    position: sticky; left: 0; z-index: 3;
+  }
+  .day-tbl td.rowname small {
+    display: block; font-size: 12px; font-weight: 500; color: var(--ink-3); margin-top: 2px;
+  }
+  .day-tbl td.muted { background: var(--surface-2); color: var(--ink-3); font-weight: 400; }
+  .day-tbl td.target { color: #FF8C00; }
+  .day-tbl td.d100col { background: #FEFAF0; }
+  .day-tbl td.current-col { background: rgba(60, 104, 174, 0.10); }
+  .day-tbl td.pass-cell { background: var(--pass-soft); color: var(--pass-ink); }
+  .day-tbl td.fail-cell { background: var(--fail-soft); color: var(--fail-ink); }
+  .day-tbl tr.pct-row td { font-size: 22px; }
+  #row-workers td:not(.rowname) { height: 118px; font-size: 20px; color: var(--brand-ink); }
+  #row-mix td:not(.rowname) { height: 164px; }
+  .day-tbl td.mix-cell {
+    padding: 10px 6px;
+    font-family: var(--font-sans);
+    font-weight: 700;
+    line-height: 1.15;
+  }
+  .mix-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 112px;
+    width: 100%;
+    padding: 14px 8px;
+    border-radius: 16px;
+    background: rgba(255,255,255,0.72);
+    box-shadow: inset 0 0 0 1px rgba(39, 67, 120, 0.06);
+  }
+  .mix-main {
+    font-family: var(--font-mono);
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -.02em;
+  }
+  .mix-actual { color: var(--ink); }
+  .mix-target { color: #FF8C00; }
+  .mix-pct {
+    font-family: var(--font-mono);
+    font-size: 18px;
+    font-weight: 800;
+    line-height: 1;
+    margin-top: 6px;
+    padding: 7px 12px 8px;
+    border-radius: 999px;
+    min-width: 74px;
+    text-align: center;
+  }
+  .mix-pct.pass { background: var(--pass-solid); color: #fff; }
+  .mix-pct.fail { background: var(--fail-solid); color: #fff; }
+  .mix-pct.muted { color: var(--ink-3); }
+  .day-tbl td.muted .mix-wrap {
+    background: rgba(241, 243, 244, 0.8);
+    box-shadow: inset 0 0 0 1px rgba(39, 67, 120, 0.04);
+  }
+</style>
+</head>
+<body class="tv">
+<div class="stage-wrap">
+<div class="stage" id="stage">
+<div class="stage-inner">
+
+  <div class="hdr">
+    <div class="hdr-line">
+      <span class="lk">Tổ sản xuất</span>
+      <span class="lv" id="h-line">—</span>
+      <span class="style"><span id="h-style">—</span> · <span id="h-customer">—</span></span>
+    </div>
+    <div class="hdr-div"></div>
+    <div class="hdr-fields">
+      <div class="fld"><span class="k">Số đơn hàng (mẹ)</span><span class="v demand mono" id="h-demand">—</span></div>
+      <div class="fld"><span class="k">SLKH / Plan qty</span><span class="v mono" id="h-slkh">—</span></div>
+      <div class="fld"><span class="k">ĐMKT</span><span class="v mono" id="h-dmkt">—</span></div>
+      <div class="fld"><span class="k">Phân loại ĐH</span><span class="v" id="h-phanloai">—</span></div>
+      <div class="fld"><span class="k">Số ngày KH</span><span class="v mono" id="h-soca">—</span></div>
+      <div class="fld"><span class="k">Ngày đạt 100%</span><span class="v gold" id="h-day100">—</span></div>
+    </div>
+    <div class="hdr-clock">
+      <span class="date" id="h-date">—</span>
+      <span class="time" id="clock">22:00</span>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <div class="card legend">
+      <span class="lh">Chú thích</span>
+      <span class="li"><span class="sw pass"></span>Đạt mục tiêu (≥ 100%)</span>
+      <span class="li"><span class="sw fail"></span>Chưa đạt (&lt; 100%)</span>
+      <span class="li"><span class="sw gold"></span>★ Mốc ngày đạt 100% ratio</span>
+      <span class="li"><span class="sw current"></span>Ngày đang xem</span>
+      <span class="li" style="margin-left:auto;"><span class="sw future"></span>Ngày tương lai (chưa SX)</span>
+    </div>
+
+    <div class="card day-card">
+      <div class="day-scroll">
+        <table class="day-tbl" id="day-tbl">
+          <thead><tr id="tr-header"></tr></thead>
+          <tbody id="tbody-data">
+            <tr id="row-workers"></tr>
+            <tr id="row-mix"></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="ftr">
+    <span class="l"><span class="refresh-dot"></span>Cập nhật <span id="ftr-time">—</span> · Auto refresh 5 phút</span>
+    <span class="r">TV-4 · Tiến độ kế hoạch theo ngày</span>
+  </div>
+
+</div>
+</div>
+</div>
+
+<script>
+const INIT_MONO = {{ init_mono | tojson }};
+const INIT_DATE = {{ init_date | tojson }};
+const REFRESH_MS = 5 * 60 * 1000;
+
+function fit() {
+  const s = document.getElementById('stage');
+  s.style.transform = 'scale(' + Math.min(innerWidth / 1920, innerHeight / 1080) + ')';
+}
+fit(); addEventListener('resize', fit);
+
+function fmtNum(n) {
+  if (n == null) return '—';
+  return Number(n).toLocaleString('vi-VN');
+}
+
+async function loadData() {
+  if (!INIT_MONO || !INIT_DATE) {
+    alert('Cần ?mono=...&date=... trên URL.');
+    return;
+  }
+  const url = `/tv/api/tv4?mono=${encodeURIComponent(INIT_MONO)}&date=${INIT_DATE}`;
+  let data;
+  try {
+    data = await fetch(url).then(r => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  } catch (e) {
+    alert('Lỗi load data: ' + e.message);
+    return;
+  }
+  render(data);
+}
+
+function render(d) {
+  const h = d.header;
+  document.getElementById('h-line').textContent = 'Tổ ' + h['Tổ'];
+  document.getElementById('h-style').textContent = 'Style ' + (h.StyleNo || '—');
+  document.getElementById('h-customer').textContent = h.Customer || '—';
+  document.getElementById('h-demand').textContent = h.MaDonKH || '—';
+  document.getElementById('h-slkh').textContent = fmtNum(h.SLKH);
+  document.getElementById('h-dmkt').textContent = h.DMKT || '—';
+  document.getElementById('h-phanloai').textContent = h.PhanLoaiDH || '—';
+  document.getElementById('h-soca').textContent = h.SoCaKH ? h.SoCaKH + ' ngày' : '—';
+  document.getElementById('h-day100').textContent = h.DayRatio1 ? 'Ngày ' + h.DayRatio1 : '—';
+
+  const day = new Date(INIT_DATE);
+  const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+  document.getElementById('h-date').textContent =
+    days[day.getDay()] + ' · ' + day.getDate() + '-' + (day.getMonth() + 1) + '-' + day.getFullYear();
+  document.getElementById('ftr-time').textContent = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+
+  // Build table headers + rows
+  const dayCols = d.days;
+  const dayRatio1 = h.DayRatio1;  // ngày ratio = 1.00 đầu tiên ⭐
+  const soca = h.SoCaKH;          // ngày cumulative chạm SLKH (tham khảo header, không tô bảng)
+
+  // Header row: rowhead "Phân loại / Ngày" + N day cols
+  let thead = '<th class="rowhead">Phân loại / Ngày</th>';
+  for (const day of dayCols) {
+    const cls = [];
+    if (day.DayN === dayRatio1) cls.push('d100');
+    if (day.IsCurrent) cls.push('current');
+    thead += `<th class="${cls.join(' ')}" title="${day.Date}">${day.DayN}</th>`;
+  }
+  document.getElementById('tr-header').innerHTML = thead;
+
+  // Row: Số lao động
+  let rowWorkers = '<td class="rowname">Số lao động</td>';
+  for (const day of dayCols) {
+    const cls = [];
+    if (day.DayN === dayRatio1) cls.push('d100col');
+    if (day.IsCurrent) cls.push('current-col');
+    if (!day.IsPast) cls.push('muted');
+    const val = day.IsPast ? day.Workers : '—';
+    rowWorkers += `<td class="${cls.join(' ')}">${val}</td>`;
+  }
+  document.getElementById('row-workers').innerHTML = rowWorkers;
+
+  // Row: Ra chuyền / Năng suất + % đạt
+  let rowMix = '<td class="rowname">Ra chuyền / Năng suất <small>Actual / target · % đạt</small></td>';
+  for (const day of dayCols) {
+    const cls = ['target'];
+    if (day.DayN === dayRatio1) cls.push('d100col');
+    if (day.IsCurrent) cls.push('current-col');
+    cls.push('mix-cell');
+    if (day.Pct == null) {
+      cls.push('muted');
+      rowMix += `<td class="${cls.join(' ')}"><div class="mix-wrap"><div class="mix-main">—/<span class="mix-target">${fmtNum(day.TargetNS)}</span></div><div class="mix-pct muted">—</div></div></td>`;
+    } else {
+      const pctClass = day.Pct >= 100 ? 'pass' : 'fail';
+      rowMix += `<td class="${cls.join(' ')}"><div class="mix-wrap"><div class="mix-main"><span class="mix-actual">${fmtNum(day.Actual)}</span>/<span class="mix-target">${fmtNum(day.TargetNS)}</span></div><div class="mix-pct ${pctClass}">${day.Pct}%</div></div></td>`;
+    }
+  }
+  document.getElementById('row-mix').innerHTML = rowMix;
+}
+
+loadData();
+setInterval(loadData, REFRESH_MS);
+</script>
+</body>
+</html>

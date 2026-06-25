@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>TV-2 · Năng suất theo cụm công đoạn</title>
+<link rel="stylesheet" href="../tv-shared-v2.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  .body { flex: 1; min-height: 0; display: grid; grid-template-rows: auto 1fr; gap: var(--s-5); }
+
+  /* ── Cluster cards ───────────────────────────────── */
+  .clusters { display: grid; grid-template-columns: repeat(6, 1fr); gap: var(--s-5); }
+  .cl { display: flex; flex-direction: column; padding: var(--s-4) var(--s-4); gap: var(--s-2); }
+  .cl .cl-name { font-size: 16px; font-weight: 700; color: var(--brand-ink); line-height: 1.2; min-height: 38px; }
+  .cl .cl-mid { flex: 1; display: flex; align-items: baseline; gap: var(--s-2); }
+  .cl .cl-big { font-family: var(--font-mono); font-weight: 700; font-size: 52px; line-height: .9; }
+  .cl .cl-unit { font-size: var(--fs-micro); color: var(--ink-3); text-transform: uppercase; letter-spacing: .04em; }
+  .cl .cl-chip { align-self: flex-start; }
+  .cl .cl-sub { display: flex; justify-content: space-between; padding-top: var(--s-2); border-top: 1px solid var(--divider-2); }
+  .cl .cl-sub .l { font-size: var(--fs-micro); color: var(--ink-3); text-transform: uppercase; letter-spacing: .04em; }
+  .cl .cl-sub .v { font-family: var(--font-mono); font-weight: 700; font-size: 15px; color: var(--ink-2); }
+
+  /* ── Chart ───────────────────────────────────────── */
+  .chartcard { display: flex; flex-direction: column; min-height: 0; }
+  .chart { flex: 1; padding: var(--s-5) var(--s-6) var(--s-4); display: grid; grid-template-columns: 56px 1fr; grid-template-rows: 1fr 42px; min-height: 0; }
+  .yax { grid-column: 1; grid-row: 1; display: flex; flex-direction: column-reverse; justify-content: space-between; text-align: right; padding-right: var(--s-3); font-family: var(--font-mono); font-size: var(--fs-label); color: var(--ink-3); }
+  .plot { grid-column: 2; grid-row: 1; position: relative; border-left: 2px solid var(--divider); border-bottom: 2px solid var(--divider); }
+  .gl { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--divider); }
+  .tline { position: absolute; left: 0; right: 0; border-top: 3px dashed var(--fail-solid); z-index: 4; }
+  .tlabel { position: absolute; right: 12px; transform: translateY(-50%); background: var(--fail-solid); color: #fff; font-size: var(--fs-label); font-weight: 700; padding: 4px 12px; border-radius: var(--r-sm); }
+  .bars { position: absolute; inset: 0 18px; display: grid; grid-template-columns: repeat(6, 1fr); gap: var(--s-6); align-items: end; }
+  .bw { height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+  .bar { width: 72%; border-radius: 8px 8px 0 0; display: flex; justify-content: center; padding-top: 14px; font-family: var(--font-mono); font-weight: 700; font-size: 30px; box-shadow: var(--sh-2); }
+  .bar.pass { background: linear-gradient(180deg, #79D9A6 0%, var(--pass-solid) 100%); color: #0B3D24; }
+  .bar.fail { background: linear-gradient(180deg, #E47C7C 0%, var(--fail-solid) 100%); color: #fff; }
+  .xax { grid-column: 2; grid-row: 2; display: grid; grid-template-columns: repeat(6, 1fr); gap: var(--s-6); padding: var(--s-3) 18px 0; }
+  .xl { text-align: center; font-size: var(--fs-body); font-weight: 600; color: var(--ink); }
+</style>
+</head>
+<body class="tv">
+<div class="stage-wrap">
+<div class="stage" id="stage">
+<div class="stage-inner">
+
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="hdr-line">
+      <span class="lk">Line</span><span class="lv">U3-L1</span><span class="style">Style 324287 · 69 LĐ</span>
+    </div>
+    <div class="hdr-div"></div>
+    <div class="hdr-fields">
+      <div class="fld"><span class="k">Nhu cầu / Demand</span><span class="v demand mono">PL-26-324287-AW26-003</span></div>
+      <div class="fld"><span class="k">K.Hàng / Customer</span><span class="v">DESIPRO</span></div>
+      <div class="fld"><span class="k">Rải chuyền / First day</span><span class="v mono">29-5</span></div>
+      <div class="fld"><span class="k">Lao động / Workers</span><span class="v mono">69</span></div>
+      <div class="fld"><span class="k">Mục tiêu / Cụm</span><span class="v mono ok">112</span></div>
+    </div>
+    <div class="hdr-clock">
+      <span class="date">Thứ Hai · 02-6-2026</span>
+      <span class="time" id="clock">13:02</span>
+    </div>
+  </div>
+
+  <!-- BODY -->
+  <div class="body">
+
+    <!-- Cluster cards -->
+    <div class="clusters">
+      <div class="card cl">
+        <div class="cl-name">Can sườn TT</div>
+        <div class="cl-mid"><span class="cl-big c-pass">130</span><span class="cl-unit">pcs<br>/ngày</span></div>
+        <span class="cl-chip pct-chip fill-pass">ĐẠT</span>
+        <div class="cl-sub"><span class="l">Lũy kế</span><span class="v">710</span></div>
+      </div>
+      <div class="card cl">
+        <div class="cl-name">HC túi ngực</div>
+        <div class="cl-mid"><span class="cl-big c-pass">120</span><span class="cl-unit">pcs<br>/ngày</span></div>
+        <span class="cl-chip pct-chip fill-pass">ĐẠT</span>
+        <div class="cl-sub"><span class="l">Lũy kế</span><span class="v">680</span></div>
+      </div>
+      <div class="card cl">
+        <div class="cl-name">Tra tay chính</div>
+        <div class="cl-mid"><span class="cl-big c-fail">110</span><span class="cl-unit">pcs<br>/ngày</span></div>
+        <span class="cl-chip pct-chip fill-fail">CHƯA ĐẠT</span>
+        <div class="cl-sub"><span class="l">Lũy kế</span><span class="v">608</span></div>
+      </div>
+      <div class="card cl">
+        <div class="cl-name">Vs đúp lai lót</div>
+        <div class="cl-mid"><span class="cl-big c-fail">100</span><span class="cl-unit">pcs<br>/ngày</span></div>
+        <span class="cl-chip pct-chip fill-fail">CHƯA ĐẠT</span>
+        <div class="cl-sub"><span class="l">Lũy kế</span><span class="v">565</span></div>
+      </div>
+      <div class="card cl">
+        <div class="cl-name">Mí DK tà</div>
+        <div class="cl-mid"><span class="cl-big c-fail">90</span><span class="cl-unit">pcs<br>/ngày</span></div>
+        <span class="cl-chip pct-chip fill-fail">CHƯA ĐẠT</span>
+        <div class="cl-sub"><span class="l">Lũy kế</span><span class="v">525</span></div>
+      </div>
+      <div class="card cl">
+        <div class="cl-name">KCS kiểm đạt</div>
+        <div class="cl-mid"><span class="cl-big c-fail">80</span><span class="cl-unit">pcs<br>/ngày</span></div>
+        <span class="cl-chip pct-chip fill-fail">CHƯA ĐẠT</span>
+        <div class="cl-sub"><span class="l">Lũy kế</span><span class="v">480</span></div>
+      </div>
+    </div>
+
+    <!-- Chart -->
+    <div class="card chartcard">
+      <div class="panel-title">Biểu đồ theo dõi năng suất cụm <span class="pt-en">Thực hiện/ngày so với mục tiêu 112 pcs</span></div>
+      <div class="chart">
+        <div class="yax"><span>0</span><span>50</span><span>100</span><span>150</span></div>
+        <div class="plot">
+          <div class="gl" style="bottom:0%"></div>
+          <div class="gl" style="bottom:33.3%"></div>
+          <div class="gl" style="bottom:66.6%"></div>
+          <div class="gl" style="bottom:100%"></div>
+          <div class="tline" style="bottom:74.6%"><span class="tlabel">MỤC TIÊU 112</span></div>
+          <div class="bars">
+            <div class="bw"><div class="bar pass" style="height:86.6%">130</div></div>
+            <div class="bw"><div class="bar pass" style="height:80%">120</div></div>
+            <div class="bw"><div class="bar fail" style="height:73.3%">110</div></div>
+            <div class="bw"><div class="bar fail" style="height:66.6%">100</div></div>
+            <div class="bw"><div class="bar fail" style="height:60%">90</div></div>
+            <div class="bw"><div class="bar fail" style="height:53.3%">80</div></div>
+          </div>
+        </div>
+        <div class="xax">
+          <div class="xl">Can sườn TT</div>
+          <div class="xl">HC túi ngực</div>
+          <div class="xl">Tra tay chính</div>
+          <div class="xl">Vs đúp lai lót</div>
+          <div class="xl">Mí DK tà</div>
+          <div class="xl">KCS kiểm đạt</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="ftr">
+    <span class="l"><span class="refresh-dot"></span>Cập nhật 13:02 · Tự làm mới mỗi 5 phút</span>
+    <span class="r">TV-2 · Năng suất theo cụm công đoạn</span>
+  </div>
+
+</div>
+</div>
+</div>
+
+<script>
+  function fit() { const s=document.getElementById('stage'); s.style.transform='scale('+Math.min(innerWidth/1920,innerHeight/1080)+')'; }
+  fit(); addEventListener('resize', fit);
+  function tick(){ const d=new Date(); const el=document.getElementById('clock'); if(el) el.textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+  tick(); setInterval(tick,15000);
+</script>
+</body>
+</html>

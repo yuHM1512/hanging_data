@@ -1,0 +1,56 @@
+/* ============================================================
+   TV shared components v2 — phong cách "Refined Light" (theo A)
+   Dùng cho TV-2 / TV-3 / TV-4 để đồng bộ với TV-1 phương án A
+   ============================================================ */
+@import url('base-v2.css');
+
+/* ── HEADER BAND ──────────────────────────────────── */
+.hdr {
+  background: linear-gradient(120deg, var(--brand-900) 0%, var(--brand-700) 62%, var(--brand-600) 100%);
+  border-radius: var(--r-lg); box-shadow: var(--sh-2); color: #fff;
+  display: grid; grid-template-columns: auto 1px 1fr auto; align-items: center;
+  gap: var(--s-6); padding: var(--s-4) var(--s-6); min-height: 104px;
+}
+.hdr-line { display: flex; flex-direction: column; gap: 2px; padding-right: var(--s-2); }
+.hdr-line .lk { font-size: var(--fs-micro); letter-spacing: .12em; opacity: .7; text-transform: uppercase; }
+.hdr-line .lv { font-family: var(--font-mono); font-weight: 700; font-size: 40px; line-height: 1; letter-spacing: .01em; }
+.hdr-line .style { margin-top: 2px; font-size: var(--fs-label); font-weight: 600; color: #BBF7D0; letter-spacing: .02em; }
+.hdr-div { width: 1px; height: 64px; background: rgba(255,255,255,.18); }
+.hdr-fields { display: flex; justify-content: space-between; gap: var(--s-6); align-items: center; }
+.fld { display: flex; flex-direction: column; gap: 5px; }
+.fld .k { font-size: var(--fs-micro); letter-spacing: .06em; text-transform: uppercase; color: rgba(255,255,255,.62); }
+.fld .v { font-size: 21px; font-weight: 700; line-height: 1; }
+.fld .v.mono { font-family: var(--font-mono); }
+.fld .v.demand { font-size: 16px; color: #C7DBFA; letter-spacing: .01em; }
+.fld .v.ok { color: #BBF7D0; }
+.hdr-clock { text-align: right; display: flex; flex-direction: column; gap: 4px; padding-left: var(--s-4); border-left: 1px solid rgba(255,255,255,.18); }
+.hdr-clock .date { font-size: var(--fs-label); color: rgba(255,255,255,.7); letter-spacing: .04em; }
+.hdr-clock .time { font-family: var(--font-mono); font-weight: 700; font-size: 38px; line-height: 1; color: #fff; }
+
+/* ── CARD / SECTION LABEL ─────────────────────────── */
+.card { background: var(--surface); border: 1px solid var(--divider); border-radius: var(--r-md); box-shadow: var(--sh-1); overflow: hidden; }
+.sec-label {
+  font-size: var(--fs-label); font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-2); margin-bottom: var(--s-3); display: flex; align-items: center; gap: var(--s-3);
+}
+.sec-label::after { content: ""; flex: 1; height: 1px; background: var(--divider); }
+
+/* Panel title (navy header strip on a card) */
+.panel-title {
+  background: linear-gradient(120deg, var(--brand-800), var(--brand-600)); color: #fff;
+  padding: var(--s-3) var(--s-5); font-size: var(--fs-s); font-weight: 700; letter-spacing: .03em;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-3);
+}
+.panel-title.danger { background: linear-gradient(120deg, #B23636, var(--fail-solid)); }
+.panel-title .pt-en { font-size: var(--fs-micro); font-weight: 500; opacity: .8; letter-spacing: .02em; }
+
+/* ── STATUS CHIP ──────────────────────────────────── */
+.pct-chip { font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: var(--r-pill); letter-spacing: .03em; display: inline-block; }
+
+/* ── FOOTER ───────────────────────────────────────── */
+.ftr { display: flex; justify-content: space-between; align-items: center; font-size: var(--fs-label); color: var(--ink-2); padding: 2px var(--s-2); }
+.ftr .l { display: flex; align-items: center; gap: var(--s-2); }
+.ftr .r { font-weight: 600; color: var(--brand-ink); letter-spacing: .02em; }
+
+/* ── STAGE BG (light canvas) ──────────────────────── */
+.tv .stage-inner { background: var(--canvas); }

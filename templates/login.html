@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Đăng nhập · Hanging Conveyor Dashboard{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="/static/css/admin.css">
+
+<main class="login-shell">
+  <section class="login-panel">
+    <div class="login-brand">
+      <span class="brand-mark"></span>
+      <div>
+        <p class="login-eyebrow">Hanging Conveyor</p>
+        <h1>Đăng nhập hệ thống</h1>
+      </div>
+    </div>
+
+    <p class="login-copy">
+      Dùng <strong>admin</strong> để vào khu vực set up.
+      Tổ trưởng đăng nhập bằng mã nhân viên để vào màn hình nhập liệu.
+    </p>
+
+    <form id="login-form" class="login-stack">
+      <label class="field">
+        <span class="field-label">Tài khoản</span>
+        <input id="login-user-id" type="text" name="UserID" autocomplete="username" placeholder="Ví dụ: admin hoặc H3724" required />
+      </label>
+      <button class="btn btn-primary login-submit" type="submit">Đăng nhập</button>
+    </form>
+
+    <div class="login-role-grid">
+      <article class="login-role-card">
+        <h2>Admin</h2>
+        <p>Quản lý nhu cầu, 6 cụm, SAM, tài khoản và cấu hình dashboard.</p>
+      </article>
+      <article class="login-role-card">
+        <h2>Tổ trưởng</h2>
+        <p>Nhập liệu Lỗi, Kiểm lại và Máy hỏng trên điện thoại tại <code>/entry</code>.</p>
+      </article>
+    </div>
+
+    <p id="login-error" class="login-error" aria-live="polite"></p>
+  </section>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (() => {
+    const form = document.getElementById('login-form');
+    const error = document.getElementById('login-error');
+    const input = document.getElementById('login-user-id');
+    input.focus();
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const userId = input.value.trim();
+      if (!userId) return;
+      error.textContent = '';
+      try {
+        const resp = await fetch('/auth/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ UserID: userId }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          throw new Error(data && data.detail ? data.detail : `HTTP ${resp.status}`);
+        }
+        window.location.href = data.next_url || '/';
+      } catch (err) {
+        error.textContent = err.message || 'Đăng nhập thất bại';
+      }
+    });
+  })();
+</script>
+{% endblock %}

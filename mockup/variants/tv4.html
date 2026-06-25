@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>TV-4 · Tiến độ kế hoạch theo ngày</title>
+<link rel="stylesheet" href="../tv-shared-v2.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  .body { flex: 1; min-height: 0; display: grid; grid-template-rows: auto 1fr; gap: var(--s-5); }
+
+  /* Field: ngày đạt 100% (gold highlight) */
+  .fld .v.gold { color: #FCD34D; font-family: var(--font-mono); font-size: 26px; }
+
+  /* ── Legend ──────────────────────────────────────── */
+  .legend { display: flex; gap: var(--s-6); align-items: center; padding: var(--s-3) var(--s-5); }
+  .legend .lh { font-size: var(--fs-label); font-weight: 700; color: var(--brand-ink); text-transform: uppercase; letter-spacing: .06em; }
+  .legend .li { display: flex; align-items: center; gap: var(--s-2); font-size: var(--fs-label); color: var(--ink-2); font-weight: 500; }
+  .legend .sw { width: 22px; height: 22px; border-radius: var(--r-sm); }
+  .legend .sw.pass { background: var(--pass-soft); border: 1px solid var(--pass-line); }
+  .legend .sw.fail { background: var(--fail-soft); border: 1px solid var(--fail-line); }
+  .legend .sw.gold { background: #FCD34D; }
+  .legend .sw.future { background: var(--surface-2); border: 1px solid var(--divider); }
+
+  /* ── Day table ───────────────────────────────────── */
+  .day-card { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .day-tbl { width: 100%; border-collapse: collapse; table-layout: fixed; flex: 1; }
+  .day-tbl th { background: var(--brand-700); color: #fff; padding: var(--s-3) 4px; font-size: 20px; font-weight: 700; text-align: center; border-right: 1px solid rgba(255,255,255,.12); }
+  .day-tbl th.rowhead { background: var(--brand-800); text-align: left; padding-left: var(--s-5); width: 216px; font-size: var(--fs-label); }
+  .day-tbl th.d100 { background: linear-gradient(180deg, #F4CB55, #E0A82E); color: var(--brand-900); position: relative; }
+  .day-tbl th.d100::after { content: "★"; position: absolute; top: 3px; right: 6px; font-size: 13px; }
+  .day-tbl td { padding: var(--s-3) 4px; border: 1px solid var(--divider); text-align: center; font-family: var(--font-mono); font-weight: 700; font-size: 23px; }
+  .day-tbl td.rowname { background: var(--brand-soft); color: var(--brand-ink); text-align: left; padding-left: var(--s-5); font-size: 15px; font-family: var(--font-sans); font-weight: 600; }
+  .day-tbl td.rowname small { display: block; font-size: 11px; font-weight: 500; color: var(--ink-3); }
+  .day-tbl td.muted { background: var(--surface-2); color: var(--ink-3); font-weight: 400; }
+  .day-tbl td.target { color: var(--fail-ink); }
+  .day-tbl td.d100col { background: #FEFAF0; }
+  .day-tbl td.pass-cell { background: var(--pass-soft); color: var(--pass-ink); }
+  .day-tbl td.fail-cell { background: var(--fail-soft); color: var(--fail-ink); }
+  .day-tbl tr.pct-row td { font-size: 19px; }
+</style>
+</head>
+<body class="tv">
+<div class="stage-wrap">
+<div class="stage" id="stage">
+<div class="stage-inner">
+
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="hdr-line">
+      <span class="lk">Tổ sản xuất</span><span class="lv">U3-L1</span><span class="style">Style 324287 · DESIPRO</span>
+    </div>
+    <div class="hdr-div"></div>
+    <div class="hdr-fields">
+      <div class="fld"><span class="k">Nhu cầu / Demand</span><span class="v demand mono">PL-26-324287-AW26-003</span></div>
+      <div class="fld"><span class="k">SLKH / Plan qty</span><span class="v mono">2,140</span></div>
+      <div class="fld"><span class="k">ĐMKT</span><span class="v mono">3.4</span></div>
+      <div class="fld"><span class="k">Phân loại ĐH</span><span class="v">Lặp lại</span></div>
+      <div class="fld"><span class="k">Số ca KH</span><span class="v mono">13</span></div>
+      <div class="fld"><span class="k">Ngày đạt 100%</span><span class="v gold">Ca 6</span></div>
+    </div>
+    <div class="hdr-clock">
+      <span class="date">Thứ Hai · 02-6-2026</span>
+      <span class="time" id="clock">13:02</span>
+    </div>
+  </div>
+
+  <!-- BODY -->
+  <div class="body">
+
+    <!-- Legend -->
+    <div class="card legend">
+      <span class="lh">Chú thích</span>
+      <span class="li"><span class="sw pass"></span>Đạt mục tiêu (≥ 100%)</span>
+      <span class="li"><span class="sw fail"></span>Chưa đạt (&lt; 100%)</span>
+      <span class="li"><span class="sw gold"></span>★ Mốc ngày đạt 100%</span>
+      <span class="li" style="margin-left:auto;"><span class="sw future"></span>Ngày tương lai (chưa SX)</span>
+    </div>
+
+    <!-- Day table -->
+    <div class="card day-card">
+      <table class="day-tbl">
+        <thead>
+          <tr>
+            <th class="rowhead">Phân loại / Ca</th>
+            <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th>
+            <th class="d100">6</th>
+            <th>7</th><th>8</th><th>9</th><th>10</th><th>11</th><th>12</th><th>13</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="rowname">Số lao động</td>
+            <td>60</td><td>60</td><td>61</td>
+            <td class="muted">—</td><td class="muted">—</td>
+            <td class="d100col muted">—</td>
+            <td class="muted">—</td><td class="muted">—</td><td class="muted">—</td>
+            <td class="muted">—</td><td class="muted">—</td><td class="muted">—</td><td class="muted">—</td>
+          </tr>
+          <tr>
+            <td class="rowname">Mục tiêu NS <small>Target output</small></td>
+            <td class="target">82</td><td class="target">106</td><td class="target">133</td>
+            <td class="target">158</td><td class="target">183</td>
+            <td class="target d100col">207</td>
+            <td class="target">209</td><td class="target">212</td><td class="target">214</td>
+            <td class="target">216</td><td class="target">218</td><td class="target">220</td><td class="target">222</td>
+          </tr>
+          <tr>
+            <td class="rowname">Ra chuyền <small>Actual output</small></td>
+            <td>80</td><td>150</td><td>170</td>
+            <td class="muted">—</td><td class="muted">—</td>
+            <td class="d100col muted">—</td>
+            <td class="muted">—</td><td class="muted">—</td><td class="muted">—</td>
+            <td class="muted">—</td><td class="muted">—</td><td class="muted">—</td><td class="muted">—</td>
+          </tr>
+          <tr class="pct-row">
+            <td class="rowname">% Đạt mục tiêu NS</td>
+            <td class="fail-cell">98.0%</td>
+            <td class="pass-cell">141.4%</td>
+            <td class="pass-cell">128.1%</td>
+            <td class="muted">—</td><td class="muted">—</td>
+            <td class="d100col muted">—</td>
+            <td class="muted">—</td><td class="muted">—</td><td class="muted">—</td>
+            <td class="muted">—</td><td class="muted">—</td><td class="muted">—</td><td class="muted">—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="ftr">
+    <span class="l"><span class="refresh-dot"></span>Cập nhật 13:02 · Tự làm mới mỗi 30 phút</span>
+    <span class="r">TV-4 · Tiến độ kế hoạch theo ngày</span>
+  </div>
+
+</div>
+</div>
+</div>
+
+<script>
+  function fit() { const s=document.getElementById('stage'); s.style.transform='scale('+Math.min(innerWidth/1920,innerHeight/1080)+')'; }
+  fit(); addEventListener('resize', fit);
+  function tick(){ const d=new Date(); const el=document.getElementById('clock'); if(el) el.textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+  tick(); setInterval(tick,15000);
+</script>
+</body>
+</html>

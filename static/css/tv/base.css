@@ -1,0 +1,66 @@
+/* Base dùng chung cho 3 variation TV-1 */
+@import url('tokens.css');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  font-family: var(--font-sans);
+  background: #0A1424;          /* letterbox đen-navy */
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  width: 100vw; height: 100vh; overflow: hidden;
+}
+
+.stage-wrap {
+  width: 100vw; height: 100vh;
+  display: flex; justify-content: center; align-items: center;
+  overflow: hidden;
+}
+.stage {
+  width: 1920px; height: 1080px;
+  transform-origin: center center;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+.stage-inner {
+  height: 100%;
+  display: flex; flex-direction: column;
+  padding: var(--s-10);
+  gap: var(--s-5);
+}
+
+/* ── Type utilities ───────────────────────────────── */
+.t-label   { font-size: var(--fs-label); font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); line-height: 1.1; }
+.t-micro   { font-size: var(--fs-micro); font-weight: 500; letter-spacing: .04em; color: var(--ink-3); line-height: 1.15; }
+.mono      { font-family: var(--font-mono); font-feature-settings: 'tnum' 1; }
+.num-hero  { font-family: var(--font-mono); font-weight: 700; font-size: var(--fs-hero); line-height: 1; letter-spacing: -.01em; }
+.num-xl    { font-family: var(--font-mono); font-weight: 700; font-size: var(--fs-xl); line-height: 1; }
+.num-l     { font-family: var(--font-mono); font-weight: 700; font-size: var(--fs-l); line-height: 1.05; }
+.num-m     { font-family: var(--font-mono); font-weight: 700; font-size: var(--fs-m); line-height: 1.05; }
+
+/* ── Status text colors (chữ, KHÔNG nền) ──────────── */
+.c-pass { color: var(--pass-ink); }
+.c-fail { color: var(--fail-ink); }
+.c-ink  { color: var(--ink); }
+
+/* ── Status fills (ô nền trạng thái) ──────────────── */
+.fill-pass { background: var(--pass-soft); color: var(--pass-ink); }
+.fill-fail { background: var(--fail-soft); color: var(--fail-ink); }
+.solid-pass { background: var(--pass-solid); color: #0B3D24; }
+.solid-fail { background: var(--fail-solid); color: #fff; }
+
+/* ── Refresh dot ──────────────────────────────────── */
+.refresh-dot {
+  display: inline-block; width: 9px; height: 9px;
+  background: var(--pass-solid); border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(89,199,140,0.5);
+  animation: pulse 2.4s ease-out infinite;
+}
+@keyframes pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(89,199,140,0.45); }
+  70%  { box-shadow: 0 0 0 7px rgba(89,199,140,0); }
+  100% { box-shadow: 0 0 0 0 rgba(89,199,140,0); }
+}

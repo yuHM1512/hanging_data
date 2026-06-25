@@ -1,0 +1,99 @@
+{% extends "admin/base.html" %}
+{% set active = 'holiday' %}
+{% block heading %}Lịch nghỉ{% endblock %}
+{% block subheading %}Ngày lễ + nghỉ riêng (không bao gồm Chủ nhật — đã được loại tự động khi tính ngày kết thúc).{% endblock %}
+
+{% block body %}
+<div class="panel">
+  <h3 class="panel-title">Thêm ngày nghỉ</h3>
+  <form id="form-add" class="row-form">
+    <label class="field">
+      <span class="field-label">Ngày</span>
+      <input type="date" name="HolidayDate" required />
+    </label>
+    <label class="field flex-grow">
+      <span class="field-label">Lí do</span>
+      <input type="text" name="Description" placeholder="Ví dụ: Nghỉ Tết Dương lịch" maxlength="200" />
+    </label>
+    <button class="btn btn-primary" type="submit">+ Thêm</button>
+  </form>
+</div>
+
+<div class="panel">
+  <h3 class="panel-title">Danh sách</h3>
+  <table class="data-table" id="tbl-holiday">
+    <thead>
+      <tr>
+        <th>Ngày</th>
+        <th>Lí do</th>
+        <th>Tạo bởi</th>
+        <th>Tạo lúc</th>
+        <th class="col-action">Hành động</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td colspan="5" class="muted">Đang tải...</td></tr>
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block page_scripts %}
+<script>
+const API = '/admin/api/holiday';
+
+async function load() {
+  const tbody = document.querySelector('#tbl-holiday tbody');
+  tbody.innerHTML = '<tr><td colspan="5" class="muted">Đang tải...</td></tr>';
+  const rows = await Admin.fetchJSON(API);
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="muted">Chưa có ngày nào.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td><strong>${r.HolidayDate}</strong></td>
+      <td>${Admin.escape(r.Description || '')}</td>
+      <td>${Admin.escape(r.CreatedBy || '')}</td>
+      <td class="muted">${r.CreatedAt || ''}</td>
+      <td class="col-action">
+        <button class="btn btn-danger btn-sm" data-del="${r.HolidayDate}">Xoá</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+document.querySelector('#form-add').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = {
+    HolidayDate: fd.get('HolidayDate'),
+    Description: fd.get('Description'),
+  };
+  try {
+    await Admin.fetchJSON(API, { method: 'POST', body: JSON.stringify(body) });
+    Admin.toast('Đã thêm.', 'ok');
+    e.target.reset();
+    load();
+  } catch (err) {
+    Admin.toast(err.message, 'error');
+  }
+});
+
+document.querySelector('#tbl-holiday').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-del]');
+  if (!btn) return;
+  const d = btn.dataset.del;
+  if (!confirm(`Xoá ngày ${d}?`)) return;
+  try {
+    await Admin.fetchJSON(`${API}/${d}`, { method: 'DELETE' });
+    Admin.toast('Đã xoá.', 'ok');
+    load();
+  } catch (err) {
+    Admin.toast(err.message, 'error');
+  }
+});
+
+load();
+</script>
+{% endblock %}

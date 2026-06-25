@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Chuyền Treo · U3-L1</title>
+<link rel="stylesheet" href="tokens-v2.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font-sans);
+    background: radial-gradient(130% 120% at 50% 0%, #16294C 0%, #0C1A33 60%);
+    color: #E9EEF8; min-height: 100vh; padding: 40px 48px 56px;
+  }
+  .wrap { max-width: 1640px; margin: 0 auto; }
+
+  /* Header */
+  .top { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 28px; flex-wrap: wrap; }
+  .top h1 { font-size: 34px; font-weight: 800; color: #fff; letter-spacing: -.01em; display: flex; align-items: center; gap: 14px; }
+  .top h1 .badge { font-family: var(--font-mono); font-size: 20px; font-weight: 700; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.18); padding: 5px 14px; border-radius: var(--r-pill); color: #BFD2F2; }
+  .top .sub { font-size: 15px; color: #93A4C0; margin-top: 8px; }
+
+  .controls { display: flex; gap: 10px; align-items: center; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,.07); color: #E9EEF8; padding: 12px 18px; border: 1px solid rgba(255,255,255,.14); border-radius: var(--r-md); font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; transition: all .15s; }
+  .btn:hover { background: rgba(255,255,255,.14); transform: translateY(-1px); }
+  .btn.primary { background: var(--brand-500); border-color: var(--brand-500); color: #fff; }
+  .btn.primary:hover { background: #4A78C0; }
+  .btn.danger { color: #FCA5A5; border-color: rgba(252,165,165,.3); }
+  .btn .dot { width: 8px; height: 8px; border-radius: 50%; background: #5DD79C; }
+
+  /* Grid */
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 28px; }
+  .card { background: #142845; border: 1px solid rgba(255,255,255,.09); border-radius: var(--r-lg); overflow: hidden; box-shadow: 0 12px 36px rgba(5,12,28,.4); cursor: pointer; transition: transform .2s, border-color .2s, box-shadow .2s; }
+  .card:hover { transform: translateY(-5px); border-color: rgba(120,160,220,.5); box-shadow: 0 20px 48px rgba(5,12,28,.55); }
+  .card-head { padding: 16px 22px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid rgba(255,255,255,.07); }
+  .card-head > .ch-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .card-head .ct { font-size: 17px; font-weight: 700; color: #fff; line-height: 1.25; }
+  .card-head .ce { font-size: 12px; color: #8295B5; }
+  .card-head .tv-no { font-family: var(--font-mono); font-weight: 700; font-size: 14px; background: var(--brand-500); color: #fff; padding: 5px 13px; border-radius: var(--r-pill); white-space: nowrap; }
+  .preview { position: relative; aspect-ratio: 16/9; width: 100%; background: var(--canvas); overflow: hidden; }
+  .preview iframe { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; border: none; transform-origin: top left; pointer-events: none; }
+  .card-foot { padding: 13px 22px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .card-foot .meta { font-size: 13px; color: #93A4C0; }
+  .card-foot .open { font-size: 13px; font-weight: 600; color: #7FB3F0; text-decoration: none; }
+  .card-foot .open:hover { text-decoration: underline; }
+
+  /* Help */
+  .help { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+  .help-box { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-left: 4px solid var(--brand-500); border-radius: var(--r-md); padding: 20px 24px; }
+  .help-box h3 { font-size: 15px; color: #BFD2F2; margin-bottom: 10px; font-weight: 700; }
+  .help-box ul { list-style: none; display: flex; flex-direction: column; gap: 7px; }
+  .help-box li { color: #A9B8D4; font-size: 14px; line-height: 1.5; padding-left: 18px; position: relative; }
+  .help-box li::before { content: "·"; position: absolute; left: 4px; color: #5A6E92; font-weight: 700; }
+  .help-box b { color: #E9EEF8; }
+
+  /* Modal */
+  .modal { display: none; position: fixed; inset: 0; background: #000; z-index: 100; }
+  .modal.show { display: flex; align-items: center; justify-content: center; }
+  .modal iframe { width: 100vw; height: 100vh; border: none; background: #0A1424; }
+  .modal-close { position: absolute; top: 18px; right: 18px; background: rgba(0,0,0,.6); color: #fff; border: 1px solid rgba(255,255,255,.2); padding: 9px 17px; border-radius: var(--r-pill); cursor: pointer; font-size: 14px; font-weight: 600; z-index: 101; font-family: inherit; }
+  .modal-info { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.6); color: #fff; padding: 7px 16px; border-radius: var(--r-pill); font-size: 13px; font-weight: 600; z-index: 101; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Dashboard Chuyền Treo <span class="badge">U3-L1</span></h1>
+      <div class="sub">4 màn hình TV · 1920×1080 (16:9) · Trạng thái Đạt / Chưa đạt theo màu Xanh / Đỏ</div>
+    </div>
+    <div class="controls">
+      <button class="btn primary" onclick="startRotate(30)"><span class="dot"></span>Auto-rotate 30s</button>
+      <button class="btn" onclick="startRotate(10)"><span class="dot"></span>10s</button>
+      <button class="btn danger" onclick="stopRotate()">■ Dừng</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card" onclick="openSingle('variants/tv1-a.html')">
+      <div class="card-head">
+        <div class="ch-text"><div class="ct">Sản lượng & nhịp độ theo giờ</div><div class="ce">Hourly output & takt</div></div>
+        <span class="tv-no">TV-1</span>
+      </div>
+      <div class="preview"><iframe src="variants/tv1-a.html" scrolling="no"></iframe></div>
+      <div class="card-foot"><span class="meta">Refresh 5 phút · KPI tổng + 5 mốc giờ + EHD</span><a class="open" href="variants/tv1-a.html" target="_blank">Mở toàn màn hình →</a></div>
+    </div>
+
+    <div class="card" onclick="openSingle('variants/tv2.html')">
+      <div class="card-head">
+        <div class="ch-text"><div class="ct">Năng suất theo cụm công đoạn</div><div class="ce">Cluster productivity</div></div>
+        <span class="tv-no">TV-2</span>
+      </div>
+      <div class="preview"><iframe src="variants/tv2.html" scrolling="no"></iframe></div>
+      <div class="card-foot"><span class="meta">Refresh 5 phút · 6 cụm + biểu đồ so mục tiêu</span><a class="open" href="variants/tv2.html" target="_blank">Mở toàn màn hình →</a></div>
+    </div>
+
+    <div class="card" onclick="openSingle('variants/tv3.html')">
+      <div class="card-head">
+        <div class="ch-text"><div class="ct">Chất lượng cuối chuyền & Máy hỏng</div><div class="ce">Endline quality & breakdown</div></div>
+        <span class="tv-no">TV-3</span>
+      </div>
+      <div class="preview"><iframe src="variants/tv3.html" scrolling="no"></iframe></div>
+      <div class="card-foot"><span class="meta">Refresh 1 phút · Bảng lỗi + Top + Máy hỏng</span><a class="open" href="variants/tv3.html" target="_blank">Mở toàn màn hình →</a></div>
+    </div>
+
+    <div class="card" onclick="openSingle('variants/tv4.html')">
+      <div class="card-head">
+        <div class="ch-text"><div class="ct">Tiến độ kế hoạch theo ngày</div><div class="ce">Daily plan progress</div></div>
+        <span class="tv-no">TV-4</span>
+      </div>
+      <div class="preview"><iframe src="variants/tv4.html" scrolling="no"></iframe></div>
+      <div class="card-foot"><span class="meta">Refresh 30 phút · Bảng 13 ca × % đạt</span><a class="open" href="variants/tv4.html" target="_blank">Mở toàn màn hình →</a></div>
+    </div>
+  </div>
+
+  <div class="help">
+    <div class="help-box">
+      <h3>Hướng dẫn xem</h3>
+      <ul>
+        <li><b>Click</b> vào card → mở dashboard toàn màn hình</li>
+        <li><b>Auto-rotate</b> → xoay vòng 4 màn (mô phỏng TV xưởng)</li>
+        <li>Phím <b>F</b> → bật fullscreen trình duyệt · <b>Esc</b> → thoát</li>
+      </ul>
+    </div>
+    <div class="help-box">
+      <h3>Triển khai trên TV (16:9)</h3>
+      <ul>
+        <li>Cố định tỷ lệ <b>1920×1080</b>, tự co dãn theo TV</li>
+        <li>Đặt độ phân giải TV <b>1920×1080</b> hoặc <b>3840×2160 (4K)</b></li>
+        <li><b>Chrome/Edge fullscreen (F11)</b>, ẩn thanh tab</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modal">
+  <button class="modal-close" onclick="closeModal()">✕ Đóng (Esc)</button>
+  <div class="modal-info" id="modal-info"></div>
+  <iframe id="modal-iframe" src=""></iframe>
+</div>
+
+<script>
+  const screens = [
+    { src: 'variants/tv1-a.html', name: 'TV-1 · Sản lượng & nhịp độ' },
+    { src: 'variants/tv2.html',   name: 'TV-2 · Năng suất cụm' },
+    { src: 'variants/tv3.html',   name: 'TV-3 · Chất lượng & Máy hỏng' },
+    { src: 'variants/tv4.html',   name: 'TV-4 · Tiến độ kế hoạch' },
+  ];
+  let rotateTimer = null, rotateIdx = 0;
+
+  function openSingle(src) {
+    stopRotate();
+    document.getElementById('modal-iframe').src = src;
+    document.getElementById('modal-info').textContent = '';
+    document.getElementById('modal').classList.add('show');
+  }
+  function closeModal() {
+    document.getElementById('modal').classList.remove('show');
+    document.getElementById('modal-iframe').src = '';
+    stopRotate();
+  }
+  function startRotate(seconds) {
+    stopRotate(); rotateIdx = 0; showSlide();
+    document.getElementById('modal').classList.add('show');
+    rotateTimer = setInterval(() => { rotateIdx = (rotateIdx + 1) % screens.length; showSlide(); }, seconds * 1000);
+  }
+  function showSlide() {
+    const s = screens[rotateIdx];
+    document.getElementById('modal-iframe').src = s.src;
+    document.getElementById('modal-info').textContent = `${s.name} · (${rotateIdx + 1}/${screens.length})`;
+  }
+  function stopRotate() { if (rotateTimer) { clearInterval(rotateTimer); rotateTimer = null; } }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeModal();
+    if (e.key === 'f' || e.key === 'F') document.documentElement.requestFullscreen?.();
+  });
+
+  function fitPreviews() {
+    document.querySelectorAll('.preview').forEach(p => {
+      const iframe = p.querySelector('iframe');
+      if (iframe) iframe.style.transform = `scale(${p.clientWidth / 1920})`;
+    });
+  }
+  window.addEventListener('load', fitPreviews);
+  window.addEventListener('resize', fitPreviews);
+  setTimeout(fitPreviews, 200); setTimeout(fitPreviews, 800);
+</script>
+</body>
+</html>

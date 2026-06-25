@@ -1,0 +1,434 @@
+{% extends "admin/base.html" %}
+{% set active = 'plan' %}
+{% block heading %}Nhu cầu con (Kế hoạch con){% endblock %}
+{% block subheading %}Khai báo từng kế hoạch con trước khi sản xuất. Tổ + Mã + Số đơn hàng auto-parse từ MONo. Chỉ hiện MONo bắt đầu chạy từ 18/04/2026 trở đi và đã có sản lượng ra chuyền (StRole=13, IsLastSeq=1).{% endblock %}
+
+{% block body %}
+<div class="panel">
+  <h3 class="panel-title">Chọn MONo để khai báo</h3>
+  <div class="row-flex">
+    <button class="btn btn-tertiary" id="btn-refresh-cands">Tải lại</button>
+  </div>
+  <table class="data-table" id="tbl-cands">
+    <thead>
+      <tr>
+        <th>MONo (full)</th>
+        <th>Số đơn hàng</th>
+        <th>Mã hàng</th>
+        <th>Tổ</th>
+        <th class="col-action">Chọn</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td colspan="5" class="muted">Đang tải...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="panel" id="form-panel" hidden>
+  <h3 class="panel-title">Khai báo Nhu cầu con</h3>
+  <form id="form-plan" class="grid-form">
+    <input type="hidden" name="MONo" />
+    <input type="hidden" name="SoDonHang" />
+    <input type="hidden" name="StyleNo" />
+
+    <label class="field">
+      <span class="field-label">MONo</span>
+      <input type="text" name="MONoDisplay" readonly />
+    </label>
+    <label class="field">
+      <span class="field-label">Số đơn hàng</span>
+      <input type="text" name="SoDonHangDisplay" readonly />
+    </label>
+    <label class="field">
+      <span class="field-label">Mã hàng</span>
+      <input type="text" name="StyleNoDisplay" readonly />
+    </label>
+    <label class="field">
+      <span class="field-label">Tổ</span>
+      <input type="number" name="LineNo" required min="1" max="10" />
+    </label>
+
+    <label class="field">
+      <span class="field-label">Ngày lên chuyền</span>
+      <input type="date" name="FirstHangDate" required />
+    </label>
+    <label class="field">
+      <span class="field-label">SLKH (sản lượng)</span>
+      <input type="number" name="SLKH" required min="1" step="1" />
+    </label>
+    <label class="field">
+      <span class="field-label">Mục tiêu giao/ngày</span>
+      <input type="number" name="DailyAim" min="1" step="1" />
+    </label>
+    <label class="field">
+      <span class="field-label">Tên khách hàng</span>
+      <input type="text" name="Customer" placeholder="VD: DECATHLON" />
+    </label>
+    <label class="field">
+      <span class="field-label">Nhu cầu mẹ (gắn nếu đã có)</span>
+      <select name="NhuCauMe">
+        <option value="">— chưa gắn —</option>
+      </select>
+    </label>
+
+    <div class="full-row">
+      <h4 style="margin: 0.5rem 0; font-family: Manrope; font-size: 1rem;">Thông tin EHD (PO list)</h4>
+      <table class="data-table" id="tbl-po">
+        <thead>
+          <tr>
+            <th>Số PO</th>
+            <th>Số lượng</th>
+            <th>Ngày xuất</th>
+            <th>Ghi chú</th>
+            <th class="col-action">Xoá</th>
+          </tr>
+        </thead>
+        <tbody id="po-rows"></tbody>
+        <tfoot>
+          <tr>
+            <td><input type="text" id="po-no" placeholder="VD: PO-123" /></td>
+            <td><input type="number" id="po-qty" placeholder="Qty" min="1" /></td>
+            <td><input type="date" id="po-ship" /></td>
+            <td><input type="text" id="po-notes" placeholder="Ghi chú" /></td>
+            <td class="col-action">
+              <button type="button" class="btn btn-tertiary btn-sm" id="btn-add-po">+ Thêm PO</button>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <label class="field full-row">
+      <span class="field-label">Ghi chú chung</span>
+      <input type="text" name="Notes" maxlength="500" />
+    </label>
+
+    <div class="full-row form-actions">
+      <button type="button" class="btn btn-tertiary" id="btn-cancel">Huỷ</button>
+      <button type="submit" class="btn btn-primary" id="btn-submit">Lưu Nhu cầu con</button>
+    </div>
+  </form>
+</div>
+
+<div class="panel">
+  <h3 class="panel-title">Đã khai báo</h3>
+  <table class="data-table" id="tbl-plans">
+    <thead>
+      <tr>
+        <th>Số đơn hàng</th>
+        <th>Mã</th>
+        <th>Tổ</th>
+        <th>Khách</th>
+        <th>Ngày bắt đầu</th>
+        <th>Kết thúc DK</th>
+        <th>SLKH</th>
+        <th>Aim/ngày</th>
+        <th>POs</th>
+        <th>NhuCauMe</th>
+        <th class="col-action">Hành động</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td colspan="11" class="muted">Đang tải...</td></tr>
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block page_scripts %}
+<script>
+const API = '/admin/api/plan';
+const API_DEMAND = '/admin/api/demand';
+let pendingPOs = [];
+let editingGuid = null;  // null = create mode; guid string = edit mode
+
+async function loadMothersInto(currentValue = '') {
+  const sel = document.querySelector('select[name="NhuCauMe"]');
+  sel.innerHTML = '<option value="">— chưa gắn —</option>';
+  try {
+    const mothers = await Admin.fetchJSON(API_DEMAND);
+    for (const m of mothers) {
+      const sel2 = document.createElement('option');
+      sel2.value = m.NhuCauMe;
+      sel2.textContent = `${m.NhuCauMe} · Mã ${m.StyleNo} · Tổ ${m.LineNoOut}`;
+      if (currentValue && currentValue === m.NhuCauMe) sel2.selected = true;
+      sel.appendChild(sel2);
+    }
+  } catch (_) {}
+}
+
+function renderCands(rows) {
+  const tbody = document.querySelector('#tbl-cands tbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="muted">Không có MONo nào.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td class="small">${Admin.escape(r.MONo)}</td>
+      <td><strong>${Admin.escape(r.SoDonHang)}</strong></td>
+      <td>${Admin.escape(r.StyleNo)}</td>
+      <td>Tổ ${r.LineNo}</td>
+      <td class="col-action">
+        <button class="btn btn-primary btn-sm"
+                data-pick='${JSON.stringify(r).replace(/'/g, "&#39;")}'>Chọn</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function loadCands() {
+  const tbody = document.querySelector('#tbl-cands tbody');
+  tbody.innerHTML = '<tr><td colspan="5" class="muted">Đang tải...</td></tr>';
+  const rows = await Admin.fetchJSON(`${API}/candidates`);
+  renderCands(rows);
+}
+
+function renderPlans(rows) {
+  const tbody = document.querySelector('#tbl-plans tbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="11" class="muted">Chưa có Nhu cầu con.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => {
+    const meBadge = r.NhuCauMe
+      ? `<span class="badge-mom">${Admin.escape(r.NhuCauMe)}</span>`
+      : '<span class="muted small">— chưa gắn —</span>';
+    return `
+      <tr>
+        <td><strong>${Admin.escape(r.SoDonHang)}</strong>
+            <div class="muted small">${Admin.escape(r.MONo)}</div></td>
+        <td>${Admin.escape(r.StyleNo)}</td>
+        <td>Tổ ${r.LineNoOut}</td>
+        <td>${Admin.escape(r.Customer || '')}</td>
+        <td>${r.FirstHangDate}</td>
+        <td>${r.EndDateExpected || '<span class="muted">—</span>'}</td>
+        <td>${r.SLKH.toLocaleString('vi-VN')}</td>
+        <td>${r.DailyAim || '<span class="muted">—</span>'}</td>
+        <td>${r.POCount} (${r.POQtySum.toLocaleString('vi-VN')})</td>
+        <td>${meBadge}</td>
+        <td class="col-action">
+          <button class="btn btn-tertiary btn-sm" data-edit="${r.PlanMaster_guid}">Sửa</button>
+          <button class="btn btn-danger btn-sm" data-del="${r.PlanMaster_guid}">Xoá</button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+async function loadPlans() {
+  const tbody = document.querySelector('#tbl-plans tbody');
+  tbody.innerHTML = '<tr><td colspan="11" class="muted">Đang tải...</td></tr>';
+  renderPlans(await Admin.fetchJSON(API));
+}
+
+function renderPOs() {
+  const tbody = document.querySelector('#po-rows');
+  if (!pendingPOs.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="muted small">Chưa có PO. Nhập ở dòng cuối và bấm "+ Thêm PO".</td></tr>';
+    return;
+  }
+  tbody.innerHTML = pendingPOs.map((p, i) => {
+    const savedBadge = p.saved ? '<span class="badge-mom" style="font-size:9px;">đã lưu</span> ' : '';
+    return `
+    <tr>
+      <td>${savedBadge}${Admin.escape(p.PONo)}</td>
+      <td>${p.Qty.toLocaleString('vi-VN')}</td>
+      <td>${p.ShipDate}</td>
+      <td>${Admin.escape(p.Notes || '')}</td>
+      <td class="col-action">
+        <button type="button" class="btn btn-tertiary btn-sm" data-rmpo="${i}">Xoá</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+document.querySelector('#btn-refresh-cands').addEventListener('click', loadCands);
+
+async function openCreate(r) {
+  editingGuid = null;
+  const f = document.querySelector('#form-plan');
+  f.reset();
+  f.MONo.value = r.MONo;
+  f.MONoDisplay.value = r.MONo;
+  f.SoDonHang.value = r.SoDonHang;
+  f.SoDonHangDisplay.value = r.SoDonHang;
+  f.StyleNo.value = r.StyleNo;
+  f.StyleNoDisplay.value = r.StyleNo;
+  f.LineNo.value = r.LineNo;
+  pendingPOs = [];
+  renderPOs();
+  await loadMothersInto();
+  document.querySelector('#btn-submit').textContent = 'Lưu Nhu cầu con';
+  document.querySelector('#form-panel').hidden = false;
+  document.querySelector('#form-panel').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function openEdit(guid) {
+  editingGuid = guid;
+  const p = await Admin.fetchJSON(`${API}/${guid}`);
+  const f = document.querySelector('#form-plan');
+  f.reset();
+  f.MONo.value = p.MONo;
+  f.MONoDisplay.value = p.MONo;
+  f.SoDonHang.value = p.SoDonHang;
+  f.SoDonHangDisplay.value = p.SoDonHang;
+  f.StyleNo.value = p.StyleNo;
+  f.StyleNoDisplay.value = p.StyleNo;
+  f.LineNo.value = p.LineNoOut;
+  f.FirstHangDate.value = p.FirstHangDate;
+  f.SLKH.value = p.SLKH;
+  f.DailyAim.value = p.DailyAim || '';
+  f.Customer.value = p.Customer || '';
+  f.Notes.value = p.Notes || '';
+  // EDIT mode: PO list = PO đã lưu (server-side). Add/delete dùng API riêng.
+  pendingPOs = (p.POs || []).map(po => ({
+    PlanPO_guid: po.PlanPO_guid,
+    PONo: po.PONo, Qty: po.Qty, ShipDate: po.ShipDate, Notes: po.Notes,
+    saved: true,    // flag = đã lưu DB
+  }));
+  renderPOs();
+  await loadMothersInto(p.NhuCauMe);
+  document.querySelector('#btn-submit').textContent = 'Cập nhật';
+  document.querySelector('#form-panel').hidden = false;
+  document.querySelector('#form-panel').scrollIntoView({ behavior: 'smooth' });
+}
+
+document.querySelector('#tbl-cands').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-pick]');
+  if (!btn) return;
+  openCreate(JSON.parse(btn.dataset.pick.replace(/&#39;/g, "'")));
+});
+
+document.querySelector('#btn-cancel').addEventListener('click', () => {
+  editingGuid = null;
+  document.querySelector('#form-panel').hidden = true;
+  document.querySelector('#form-plan').reset();
+  pendingPOs = [];
+});
+
+document.querySelector('#btn-add-po').addEventListener('click', async () => {
+  const pono = document.querySelector('#po-no').value.trim();
+  const qty = parseInt(document.querySelector('#po-qty').value);
+  const ship = document.querySelector('#po-ship').value;
+  const notes = document.querySelector('#po-notes').value.trim();
+  if (!pono || !qty || !ship) {
+    Admin.toast('PO cần đủ: Số / Qty / Ngày xuất.', 'error');
+    return;
+  }
+  const po = { PONo: pono, Qty: qty, ShipDate: ship, Notes: notes || null };
+  // Edit mode: gọi API thêm PO ngay vào DB
+  if (editingGuid) {
+    try {
+      await Admin.fetchJSON(`${API}/${editingGuid}/po`, {
+        method: 'POST', body: JSON.stringify(po),
+      });
+      // Reload PO list từ server để lấy PlanPO_guid mới
+      const fresh = await Admin.fetchJSON(`${API}/${editingGuid}`);
+      pendingPOs = (fresh.POs || []).map(p => ({
+        PlanPO_guid: p.PlanPO_guid,
+        PONo: p.PONo, Qty: p.Qty, ShipDate: p.ShipDate, Notes: p.Notes,
+        saved: true,
+      }));
+      Admin.toast('Đã thêm PO.', 'ok');
+    } catch (err) {
+      Admin.toast(err.message, 'error');
+      return;
+    }
+  } else {
+    // Create mode: chỉ push vào pending, lưu cùng plan khi submit
+    pendingPOs.push(po);
+  }
+  document.querySelector('#po-no').value = '';
+  document.querySelector('#po-qty').value = '';
+  document.querySelector('#po-ship').value = '';
+  document.querySelector('#po-notes').value = '';
+  renderPOs();
+});
+
+document.querySelector('#po-rows').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-rmpo]');
+  if (!btn) return;
+  const idx = parseInt(btn.dataset.rmpo);
+  const po = pendingPOs[idx];
+  // Nếu PO đã lưu DB → gọi API xoá luôn
+  if (po.saved && po.PlanPO_guid) {
+    if (!confirm(`Xoá PO "${po.PONo}" khỏi DB?`)) return;
+    try {
+      await Admin.fetchJSON(`/admin/api/po/${po.PlanPO_guid}`, { method: 'DELETE' });
+      Admin.toast('Đã xoá PO khỏi DB.', 'ok');
+    } catch (err) {
+      Admin.toast(err.message, 'error');
+      return;
+    }
+  }
+  pendingPOs.splice(idx, 1);
+  renderPOs();
+});
+
+document.querySelector('#form-plan').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const baseBody = {
+    LineNo: parseInt(fd.get('LineNo')),
+    FirstHangDate: fd.get('FirstHangDate'),
+    SLKH: parseInt(fd.get('SLKH')),
+    DailyAim: fd.get('DailyAim') ? parseInt(fd.get('DailyAim')) : null,
+    Customer: fd.get('Customer') || null,
+    NhuCauMe: fd.get('NhuCauMe') || null,
+    Notes: fd.get('Notes') || null,
+  };
+  try {
+    if (editingGuid) {
+      // PUT — chỉ update bản chính (PO không sửa trong edit để giữ đơn giản)
+      await Admin.fetchJSON(`${API}/${editingGuid}`, {
+        method: 'PUT', body: JSON.stringify(baseBody),
+      });
+      Admin.toast('Đã cập nhật.', 'ok');
+    } else {
+      // POST — tạo mới + PO
+      const body = {
+        ...baseBody,
+        MONo: fd.get('MONo'),
+        SoDonHang: fd.get('SoDonHang'),
+        StyleNo: fd.get('StyleNo'),
+        POs: pendingPOs,
+      };
+      await Admin.fetchJSON(API, { method: 'POST', body: JSON.stringify(body) });
+      Admin.toast('Đã lưu Nhu cầu con.', 'ok');
+    }
+    editingGuid = null;
+    document.querySelector('#form-panel').hidden = true;
+    e.target.reset();
+    pendingPOs = [];
+    loadCands();
+    loadPlans();
+  } catch (err) {
+    Admin.toast(err.message, 'error');
+  }
+});
+
+document.querySelector('#tbl-plans').addEventListener('click', async (e) => {
+  const editBtn = e.target.closest('[data-edit]');
+  if (editBtn) {
+    openEdit(editBtn.dataset.edit);
+    return;
+  }
+  const delBtn = e.target.closest('[data-del]');
+  if (!delBtn) return;
+  if (!confirm('Xoá kế hoạch này? PO list cũng sẽ xoá theo.')) return;
+  try {
+    await Admin.fetchJSON(`${API}/${delBtn.dataset.del}`, { method: 'DELETE' });
+    Admin.toast('Đã xoá.', 'ok');
+    loadCands();
+    loadPlans();
+  } catch (err) {
+    Admin.toast(err.message, 'error');
+  }
+});
+
+renderPOs();
+loadCands();
+loadPlans();
+</script>
+{% endblock %}

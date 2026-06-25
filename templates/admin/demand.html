@@ -1,0 +1,209 @@
+{% extends "admin/base.html" %}
+{% set active = 'demand' %}
+{% block heading %}Nhu cầu mẹ{% endblock %}
+{% block subheading %}Chọn 1 Nhu cầu con (đã khai báo) làm mẹ. Tổ + Mã hàng auto-lấy từ con. Mẹ chỉ cần thêm ĐMKT / Phân loại / LĐ biên chế.{% endblock %}
+
+{% block body %}
+<div class="panel">
+  <h3 class="panel-title">Chọn Nhu cầu con chưa có mẹ</h3>
+  <p class="muted small">List dưới chỉ hiện các con (tPlanMaster) chưa được gán làm NhuCauMe nào. Tạo NhuCauCon trước ở <a href="/admin/plan">trang Nhu cầu con</a>.</p>
+  <table class="data-table" id="tbl-cands">
+    <thead>
+      <tr>
+        <th>Số đơn hàng (sẽ thành NhuCauMe)</th>
+        <th>Mã hàng</th>
+        <th>Tổ</th>
+        <th>Ngày bắt đầu</th>
+        <th>SLKH con</th>
+        <th>Customer</th>
+        <th class="col-action">Chọn</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td colspan="7" class="muted">Đang tải...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="panel" id="form-panel" hidden>
+  <h3 class="panel-title">Đăng ký Nhu cầu mẹ</h3>
+  <form id="form-demand" class="grid-form">
+    <label class="field">
+      <span class="field-label">NhuCauMe (= Số đơn hàng con đầu)</span>
+      <input type="text" name="NhuCauMe" required readonly />
+    </label>
+    <label class="field">
+      <span class="field-label">Mã hàng (auto)</span>
+      <input type="text" name="StyleNo" readonly />
+    </label>
+    <label class="field">
+      <span class="field-label">Tổ (auto)</span>
+      <input type="text" name="LineNo" readonly />
+    </label>
+    <label class="field">
+      <span class="field-label">ĐMKT (định mức kỹ thuật)</span>
+      <input type="number" name="DMKT" required min="0.001" step="0.001" placeholder="VD: 10.5" />
+    </label>
+    <label class="field">
+      <span class="field-label">Phân loại ĐH</span>
+      <select name="PhanLoaiDH" required>
+        <option value="">— chọn —</option>
+        <option value="Đặc biệt">Đặc biệt</option>
+        <option value="Mới">Mới</option>
+        <option value="Lặp lại">Lặp lại</option>
+        <option value="Vest">Vest</option>
+      </select>
+    </label>
+    <label class="field">
+      <span class="field-label">LĐ biên chế</span>
+      <input type="number" name="LDBienChe" required min="1" step="1" placeholder="VD: 65" />
+    </label>
+    <label class="field full-row">
+      <span class="field-label">Ghi chú</span>
+      <input type="text" name="Notes" maxlength="500" />
+    </label>
+    <div class="full-row form-actions">
+      <button type="button" class="btn btn-tertiary" id="btn-cancel">Huỷ</button>
+      <button type="submit" class="btn btn-primary">Lưu Nhu cầu mẹ</button>
+    </div>
+  </form>
+</div>
+
+<div class="panel">
+  <h3 class="panel-title">Đã đăng ký</h3>
+  <table class="data-table" id="tbl-demand">
+    <thead>
+      <tr>
+        <th>NhuCauMe</th>
+        <th>Mã</th>
+        <th>Tổ</th>
+        <th>SLKH (auto = Σ con)</th>
+        <th>Số con</th>
+        <th>ĐMKT</th>
+        <th>Phân loại</th>
+        <th>LĐ</th>
+        <th class="col-action">Hành động</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td colspan="9" class="muted">Đang tải...</td></tr>
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block page_scripts %}
+<script>
+const API = '/admin/api/demand';
+
+function renderCands(rows) {
+  const tbody = document.querySelector('#tbl-cands tbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="muted">Không còn Nhu cầu con nào chờ gắn mẹ.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td><strong>${Admin.escape(r.SoDonHang)}</strong>
+          <div class="muted small">${Admin.escape(r.MONo)}</div></td>
+      <td>${Admin.escape(r.StyleNo)}</td>
+      <td>Tổ ${r.LineNoOut}</td>
+      <td>${r.FirstHangDate}</td>
+      <td>${r.SLKH ? r.SLKH.toLocaleString('vi-VN') : '<span class="muted">—</span>'}</td>
+      <td>${Admin.escape(r.Customer || '')}</td>
+      <td class="col-action">
+        <button class="btn btn-primary btn-sm"
+                data-pick='${JSON.stringify(r).replace(/'/g, "&#39;")}'>Chọn làm mẹ</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function loadCands() {
+  const tbody = document.querySelector('#tbl-cands tbody');
+  tbody.innerHTML = '<tr><td colspan="7" class="muted">Đang tải...</td></tr>';
+  renderCands(await Admin.fetchJSON(`${API}/candidates`));
+}
+
+async function loadDemand() {
+  const tbody = document.querySelector('#tbl-demand tbody');
+  tbody.innerHTML = '<tr><td colspan="9" class="muted">Đang tải...</td></tr>';
+  const rows = await Admin.fetchJSON(API);
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="muted">Chưa có Nhu cầu mẹ.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td><strong>${Admin.escape(r.NhuCauMe)}</strong></td>
+      <td>${Admin.escape(r.StyleNo)}</td>
+      <td>Tổ ${r.LineNoOut}</td>
+      <td><strong>${r.SLKH.toLocaleString('vi-VN')}</strong></td>
+      <td>${r.ChildCount}</td>
+      <td>${r.DMKT}</td>
+      <td>${Admin.escape(r.PhanLoaiDH)}</td>
+      <td>${r.LDBienChe}</td>
+      <td class="col-action">
+        <button class="btn btn-danger btn-sm" data-del="${Admin.escape(r.NhuCauMe)}">Xoá</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+document.querySelector('#tbl-cands').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-pick]');
+  if (!btn) return;
+  const r = JSON.parse(btn.dataset.pick.replace(/&#39;/g, "'"));
+  const f = document.querySelector('#form-demand');
+  f.NhuCauMe.value = r.SoDonHang;
+  f.StyleNo.value = r.StyleNo;
+  f.LineNo.value = r.LineNoOut;
+  document.querySelector('#form-panel').hidden = false;
+  document.querySelector('#form-panel').scrollIntoView({ behavior: 'smooth' });
+});
+
+document.querySelector('#btn-cancel').addEventListener('click', () => {
+  document.querySelector('#form-panel').hidden = true;
+});
+
+document.querySelector('#form-demand').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = {
+    NhuCauMe: fd.get('NhuCauMe'),
+    DMKT: parseFloat(fd.get('DMKT')),
+    PhanLoaiDH: fd.get('PhanLoaiDH'),
+    LDBienChe: parseInt(fd.get('LDBienChe')),
+    Notes: fd.get('Notes') || null,
+  };
+  try {
+    await Admin.fetchJSON(API, { method: 'POST', body: JSON.stringify(body) });
+    Admin.toast('Đã lưu Nhu cầu mẹ. Quay lại trang Nhu cầu con để gắn mẹ vào con.', 'ok');
+    document.querySelector('#form-panel').hidden = true;
+    e.target.reset();
+    loadCands();
+    loadDemand();
+  } catch (err) {
+    Admin.toast(err.message, 'error');
+  }
+});
+
+document.querySelector('#tbl-demand').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-del]');
+  if (!btn) return;
+  const k = btn.dataset.del;
+  if (!confirm(`Xoá Nhu cầu mẹ "${k}"? Các con sẽ unlink (NhuCauMe = NULL).`)) return;
+  try {
+    await Admin.fetchJSON(`${API}/${encodeURIComponent(k)}`, { method: 'DELETE' });
+    Admin.toast('Đã xoá.', 'ok');
+    loadCands();
+    loadDemand();
+  } catch (err) {
+    Admin.toast(err.message, 'error');
+  }
+});
+
+loadCands();
+loadDemand();
+</script>
+{% endblock %}

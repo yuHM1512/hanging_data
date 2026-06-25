@@ -1,0 +1,257 @@
+{% extends "admin/base.html" %}
+{% set active = 'cluster' %}
+{% block heading %}6 cụm theo dõi sản lượng{% endblock %}
+{% block subheading %}Mỗi Nhu cầu mẹ chọn 6 cụm/công đoạn dọc tuyến — 1 đầu vào + 4 giữa + 1 KCS cuối. Phải theo thứ tự sản xuất (Odr tăng dần).{% endblock %}
+
+{% block body %}
+<div class="panel">
+  <h3 class="panel-title">Danh sách Nhu cầu mẹ</h3>
+  <table class="data-table" id="tbl-mums">
+    <thead>
+      <tr>
+        <th>NhuCauMe</th>
+        <th>Mã hàng</th>
+        <th>Tổ</th>
+        <th>Trạng thái cấu hình</th>
+        <th class="col-action">Hành động</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td colspan="5" class="muted">Đang tải...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="panel" id="config-panel" hidden>
+  <h3 class="panel-title" id="config-title">Cấu hình cụm</h3>
+  <p class="muted small" id="config-info"></p>
+
+  <div class="cluster-grid">
+    <div class="cluster-slot" data-order="1" data-role="first">
+      <div class="slot-label">Cụm 1 — Đầu vào</div>
+      <select class="slot-pick"></select>
+      <div class="slot-stations muted small"></div>
+    </div>
+    <div class="cluster-slot" data-order="2">
+      <div class="slot-label">Cụm 2 — Giữa</div>
+      <select class="slot-pick"></select>
+      <div class="slot-stations muted small"></div>
+    </div>
+    <div class="cluster-slot" data-order="3">
+      <div class="slot-label">Cụm 3 — Giữa</div>
+      <select class="slot-pick"></select>
+      <div class="slot-stations muted small"></div>
+    </div>
+    <div class="cluster-slot" data-order="4">
+      <div class="slot-label">Cụm 4 — Giữa</div>
+      <select class="slot-pick"></select>
+      <div class="slot-stations muted small"></div>
+    </div>
+    <div class="cluster-slot" data-order="5">
+      <div class="slot-label">Cụm 5 — Giữa</div>
+      <select class="slot-pick"></select>
+      <div class="slot-stations muted small"></div>
+    </div>
+    <div class="cluster-slot" data-order="6" data-role="last">
+      <div class="slot-label">Cụm 6 — KCS (cuối)</div>
+      <select class="slot-pick"></select>
+      <div class="slot-stations muted small"></div>
+    </div>
+  </div>
+
+  <div class="form-actions" style="margin-top: 1.5rem;">
+    <button type="button" class="btn btn-tertiary" id="btn-cancel">Đóng</button>
+    <button type="button" class="btn btn-primary" id="btn-save">Lưu 6 cụm</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_scripts %}
+<style>
+.cluster-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+.cluster-slot {
+  background: var(--surface-container-low);
+  padding: 1rem;
+  border-radius: var(--r-md);
+}
+.cluster-slot[data-role="first"] {
+  background: linear-gradient(135deg, var(--secondary-container), var(--surface-container-low));
+}
+.cluster-slot[data-role="last"] {
+  background: linear-gradient(135deg, var(--tertiary-container), var(--surface-container-low));
+  color: var(--on-tertiary-container);
+}
+.slot-label {
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+  color: var(--on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.slot-pick {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  background: #fff;
+  border: none;
+  border-radius: var(--r-sm);
+  font-size: 0.9rem;
+}
+.slot-stations {
+  margin-top: 0.4rem;
+  min-height: 1em;
+}
+.status-pill {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.status-pill.ok { background: var(--secondary-container); color: var(--on-secondary-container); }
+.status-pill.todo { background: var(--surface-container); color: var(--on-surface-variant); }
+</style>
+
+<script>
+const API = '/admin/api/cluster';
+let currentNhuCauMe = null;
+let groupsCache = [];   // [{RouteStepOdr, GroupLabel, SeqNoList, StepCount, StationNos}]
+
+function renderMums(rows) {
+  const tbody = document.querySelector('#tbl-mums tbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="muted">Chưa có NhuCauMe. Tạo ở <a href="/admin/demand">Nhu cầu mẹ</a> trước.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => {
+    const pill = r.ClusterCount === 6
+      ? '<span class="status-pill ok">Đã đủ 6/6</span>'
+      : `<span class="status-pill todo">${r.ClusterCount}/6</span>`;
+    return `
+      <tr>
+        <td><strong>${Admin.escape(r.NhuCauMe)}</strong></td>
+        <td>${Admin.escape(r.StyleNo)}</td>
+        <td>Tổ ${r.LineNoOut}</td>
+        <td>${pill}</td>
+        <td class="col-action">
+          <button class="btn btn-primary btn-sm"
+                  data-config="${Admin.escape(r.NhuCauMe)}">Cấu hình</button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+async function loadMums() {
+  const tbody = document.querySelector('#tbl-mums tbody');
+  tbody.innerHTML = '<tr><td colspan="5" class="muted">Đang tải...</td></tr>';
+  renderMums(await Admin.fetchJSON(`${API}/list`));
+}
+
+async function openConfig(nhuCauMe) {
+  currentNhuCauMe = nhuCauMe;
+  document.querySelector('#config-title').textContent = `Cấu hình 6 cụm cho ${nhuCauMe}`;
+  document.querySelector('#config-info').textContent = 'Đang tải route...';
+
+  const [groupsData, existing] = await Promise.all([
+    Admin.fetchJSON(`${API}/groups/${encodeURIComponent(nhuCauMe)}`),
+    Admin.fetchJSON(`${API}/${encodeURIComponent(nhuCauMe)}`),
+  ]);
+  groupsCache = groupsData.Groups;
+  document.querySelector('#config-info').textContent =
+    `Route từ MONo ${groupsData.MONo} · ${groupsCache.length} cụm có sẵn`;
+
+  // Build option list (shared by all 6 selects)
+  const optionsHTML = '<option value="">— chọn —</option>' +
+    groupsCache.map(g => `<option value="${g.RouteStepOdr}"
+      data-stations="${g.StationNos || ''}">
+      Odr ${g.RouteStepOdr} · ${(g.GroupLabel || '').substring(0, 55)}
+    </option>`).join('');
+
+  document.querySelectorAll('.slot-pick').forEach(sel => {
+    sel.innerHTML = optionsHTML;
+    sel.addEventListener('change', updateStationHints);
+  });
+
+  // Restore existing config nếu có
+  for (const e of existing) {
+    const slot = document.querySelector(`.cluster-slot[data-order="${e.ClusterOrder}"] .slot-pick`);
+    if (slot) slot.value = e.RouteStepOdr;
+  }
+  updateStationHints();
+
+  document.querySelector('#config-panel').hidden = false;
+  document.querySelector('#config-panel').scrollIntoView({ behavior: 'smooth' });
+}
+
+function updateStationHints() {
+  document.querySelectorAll('.cluster-slot').forEach(slot => {
+    const sel = slot.querySelector('.slot-pick');
+    const opt = sel.options[sel.selectedIndex];
+    const stations = opt && opt.dataset.stations ? opt.dataset.stations : '';
+    slot.querySelector('.slot-stations').textContent =
+      stations ? `Trạm vật lý: ${stations}` : '';
+  });
+}
+
+document.querySelector('#tbl-mums').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-config]');
+  if (!btn) return;
+  openConfig(btn.dataset.config);
+});
+
+document.querySelector('#btn-cancel').addEventListener('click', () => {
+  document.querySelector('#config-panel').hidden = true;
+  currentNhuCauMe = null;
+});
+
+document.querySelector('#btn-save').addEventListener('click', async () => {
+  const picks = [];
+  let valid = true;
+  document.querySelectorAll('.cluster-slot').forEach(slot => {
+    const order = parseInt(slot.dataset.order);
+    const role = slot.dataset.role || null;
+    const sel = slot.querySelector('.slot-pick');
+    if (!sel.value) {
+      valid = false;
+      return;
+    }
+    const odr = parseInt(sel.value);
+    const g = groupsCache.find(x => x.RouteStepOdr === odr);
+    picks.push({
+      ClusterOrder: order,
+      RouteStepOdr: odr,
+      GroupLabel: g ? g.GroupLabel : '',
+      Role: role,
+    });
+  });
+  if (!valid) {
+    Admin.toast('Cần chọn đủ 6 cụm.', 'error');
+    return;
+  }
+  // Check production order
+  const odrs = picks.map(p => p.RouteStepOdr);
+  for (let i = 1; i < 6; i++) {
+    if (odrs[i] <= odrs[i - 1]) {
+      Admin.toast(`Cụm ${i + 1} (Odr ${odrs[i]}) phải đứng SAU cụm ${i} (Odr ${odrs[i - 1]}).`, 'error');
+      return;
+    }
+  }
+  try {
+    await Admin.fetchJSON(`${API}/${encodeURIComponent(currentNhuCauMe)}`, {
+      method: 'PUT', body: JSON.stringify({ Picks: picks }),
+    });
+    Admin.toast('Đã lưu 6 cụm.', 'ok');
+    document.querySelector('#config-panel').hidden = true;
+    loadMums();
+  } catch (err) {
+    Admin.toast(err.message, 'error');
+  }
+});
+
+loadMums();
+</script>
+{% endblock %}

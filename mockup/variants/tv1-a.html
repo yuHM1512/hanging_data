@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>TV-1 · Phương án A — Refined Light</title>
+<link rel="stylesheet" href="../base-v2.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  .va { --gap: var(--s-5); }
+  .va .stage-inner { background: var(--canvas); }
+
+  /* ── HEADER ──────────────────────────────────────── */
+  .hdr {
+    background:
+      linear-gradient(120deg, var(--brand-900) 0%, var(--brand-700) 62%, var(--brand-600) 100%);
+    border-radius: var(--r-lg);
+    box-shadow: var(--sh-2);
+    color: #fff;
+    display: grid;
+    grid-template-columns: auto 1px 1fr auto;
+    align-items: center;
+    gap: var(--s-6);
+    padding: var(--s-4) var(--s-6);
+    min-height: 104px;
+  }
+  .hdr-line {
+    display: flex; flex-direction: column; gap: 2px;
+    padding-right: var(--s-2);
+  }
+  .hdr-line .lk { font-size: var(--fs-micro); letter-spacing: .12em; opacity: .7; text-transform: uppercase; }
+  .hdr-line .lv {
+    font-family: var(--font-mono); font-weight: 700; font-size: 40px; line-height: 1;
+    letter-spacing: .01em;
+  }
+  .hdr-line .style {
+    margin-top: 2px; font-size: var(--fs-label); font-weight: 600;
+    color: #BBF7D0; letter-spacing: .02em;
+  }
+  .hdr-div { width: 1px; height: 64px; background: rgba(255,255,255,.18); }
+  .hdr-fields {
+    display: grid; grid-template-columns: repeat(6, auto); justify-content: space-between;
+    gap: var(--s-6); align-items: center;
+  }
+  .fld { display: flex; flex-direction: column; gap: 5px; }
+  .fld .k { font-size: var(--fs-micro); letter-spacing: .06em; text-transform: uppercase; color: rgba(255,255,255,.62); }
+  .fld .v { font-size: 21px; font-weight: 700; line-height: 1; }
+  .fld .v.mono { font-family: var(--font-mono); }
+  .fld .v.demand { font-size: 16px; color: #C7DBFA; letter-spacing: .01em; }
+  .hdr-clock {
+    text-align: right; display: flex; flex-direction: column; gap: 4px;
+    padding-left: var(--s-4); border-left: 1px solid rgba(255,255,255,.18);
+  }
+  .hdr-clock .date { font-size: var(--fs-label); color: rgba(255,255,255,.7); letter-spacing: .04em; }
+  .hdr-clock .time { font-family: var(--font-mono); font-weight: 700; font-size: 38px; line-height: 1; color: #fff; }
+
+  /* ── BODY GRID ───────────────────────────────────── */
+  .body {
+    flex: 1; min-height: 0;
+    display: grid; grid-template-columns: 1fr 348px; gap: var(--gap);
+  }
+  .main {
+    display: grid; grid-template-rows: auto 1fr auto; gap: var(--gap); min-height: 0;
+  }
+
+  /* ── KPI ─────────────────────────────────────────── */
+  .kpi {
+    display: grid; grid-template-columns: 360px 1fr; gap: var(--gap);
+  }
+  .card {
+    background: var(--surface); border: 1px solid var(--divider);
+    border-radius: var(--r-md); box-shadow: var(--sh-1); overflow: hidden;
+  }
+  .sec-label {
+    font-size: var(--fs-label); font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--ink-2); margin-bottom: var(--s-3);
+    display: flex; align-items: center; gap: var(--s-3);
+  }
+  .sec-label::after { content: ""; flex: 1; height: 1px; background: var(--divider); }
+
+  /* Hero progress card */
+  .hero { display: flex; flex-direction: column; padding: var(--s-5) var(--s-6); }
+  .hero .h-top { display: flex; justify-content: space-between; align-items: baseline; }
+  .hero .h-title { font-size: var(--fs-s); font-weight: 700; color: var(--brand-ink); }
+  .hero .h-en { font-size: var(--fs-micro); color: var(--ink-3); }
+  .hero .h-mid { margin: auto 0; }
+  .hero .pct-line { display: flex; align-items: flex-end; justify-content: space-between; }
+  .hero .pct { font-family: var(--font-mono); font-weight: 700; font-size: 72px; line-height: .85; }
+  .hero .pct-tag {
+    font-size: var(--fs-micro); font-weight: 700; padding: 4px 10px; border-radius: var(--r-pill);
+    letter-spacing: .04em; margin-bottom: 10px;
+  }
+  .hero .h-rows { display: flex; gap: var(--s-8); margin-top: var(--s-5); padding-top: var(--s-4); border-top: 1px solid var(--divider); }
+  .hero .h-rows .r .rk { font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); }
+  .hero .h-rows .r .rv { font-family: var(--font-mono); font-weight: 700; font-size: 28px; color: var(--ink); line-height: 1.1; }
+  .bar { height: 12px; border-radius: var(--r-pill); background: var(--surface-2); overflow: hidden; margin-top: var(--s-4); border: 1px solid var(--divider); }
+  .bar > i { display: block; height: 100%; border-radius: var(--r-pill); }
+
+  /* Stat cards grid */
+  .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--gap); }
+  .stat { display: flex; flex-direction: column; padding: var(--s-4); gap: var(--s-2); }
+  .stat .s-head { display: flex; flex-direction: column; gap: 1px; }
+  .stat .s-k { font-size: var(--fs-label); font-weight: 700; color: var(--brand-ink); letter-spacing: .01em; line-height: 1.15; }
+  .stat .s-en { font-size: var(--fs-micro); color: var(--ink-3); }
+  .stat .s-mid { flex: 1; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 6px; }
+  .stat .s-pct { font-family: var(--font-mono); font-weight: 700; font-size: 42px; line-height: .9; }
+  .stat .s-sub { display: flex; gap: var(--s-4); padding-top: var(--s-2); border-top: 1px solid var(--divider-2); }
+  .stat .s-sub .ss { display: flex; align-items: baseline; gap: 5px; }
+  .stat .s-sub .ssk { font-size: var(--fs-micro); color: var(--ink-3); text-transform: uppercase; letter-spacing: .04em; }
+  .stat .s-sub .ssv { font-family: var(--font-mono); font-weight: 700; font-size: 16px; color: var(--ink-2); }
+  .pct-chip { font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: var(--r-pill); letter-spacing: .03em; align-self: flex-start; }
+  .endday .ed-line { display: flex; align-items: center; gap: var(--s-2); }
+  .endday .edv { font-family: var(--font-mono); font-weight: 700; font-size: 30px; line-height: 1; }
+  .endday .ed-arrow { color: var(--ink-3); font-size: 20px; }
+
+  /* ── HOURS ───────────────────────────────────────── */
+  .hours-sec { display: flex; flex-direction: column; min-height: 0; }
+  .hours { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--gap); flex: 1; min-height: 0; }
+  .hour {
+    background: linear-gradient(158deg, var(--brand-700) 0%, var(--brand-900) 100%);
+    border-radius: var(--r-md); box-shadow: var(--sh-2); overflow: hidden; display: flex; flex-direction: column;
+  }
+  .hour .h-time { background: rgba(255,255,255,.10); color: #fff; font-family: var(--font-mono);
+    font-weight: 700; font-size: 30px; text-align: center; padding: 13px; letter-spacing: .02em; }
+  .hour .h-pair { display: grid; grid-template-columns: 1fr 1fr; flex: 1; }
+  .hour .hc { padding: 12px 6px; text-align: center; display: flex; flex-direction: column; gap: 7px; align-items: center; justify-content: center; }
+  .hour .hc + .hc { border-left: 1px solid rgba(255,255,255,.14); }
+  .hour .hc:not(.act) { background: var(--surface); }
+  .hour .hc:not(.act) .hk { color: var(--brand-500); }
+  .hour .hc:not(.act) .hv { color: var(--brand-ink); }
+  .hour .hc .hk { font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .07em; color: rgba(255,255,255,.62); }
+  .hour .hc .hv { font-family: var(--font-mono); font-weight: 700; font-size: 50px; line-height: 1; color: #fff; }
+  .hour .hc.act.is-fail { background: var(--fail-solid); }
+  .hour .hc.act.is-fail .hk { color: rgba(255,255,255,.85); }
+  .hour .hc.act.is-fail .hv { color: #fff; }
+  .hour .hc.act.is-pass { background: var(--pass-solid); }
+  .hour .hc.act.is-pass .hk { color: rgba(11,61,36,.72); }
+  .hour .hc.act.is-pass .hv { color: #0B3D24; }
+  .hour .hc.act.is-empty { background: rgba(255,255,255,.05); }
+  .hour .hc.act.is-empty .hk { color: rgba(255,255,255,.5); }
+  .hour .hc.act.is-empty .hv { color: rgba(255,255,255,.4); }
+
+  /* ── ROOT CAUSE ──────────────────────────────────── */
+  .rc {
+    background: var(--warn-soft); border: 1px solid var(--warn-line);
+    border-left: 5px solid var(--warn-solid); border-radius: var(--r-md);
+    padding: var(--s-3) var(--s-6); display: flex; flex-direction: column; gap: var(--s-1); min-height: 0;
+  }
+  .rc .rc-h { font-size: var(--fs-label); font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--warn-ink); margin-bottom: var(--s-2); display: flex; align-items: center; gap: var(--s-2); }
+  .rc .rc-item { display: flex; gap: var(--s-4); padding: var(--s-2) 0; font-size: 15px; color: var(--ink); line-height: 1.45; border-top: 1px dashed var(--warn-line); }
+  .rc .rc-item:first-of-type { border-top: none; }
+  .rc .rc-t { font-family: var(--font-mono); font-weight: 700; color: var(--warn-ink); font-size: 17px; min-width: 58px; }
+  .rc .rc-item b { color: var(--brand-ink); }
+
+  /* ── EHD RAIL ────────────────────────────────────── */
+  .ehd { background: var(--surface); border: 1px solid var(--divider); border-radius: var(--r-md);
+    box-shadow: var(--sh-1); display: flex; flex-direction: column; overflow: hidden; }
+  .ehd .e-head { background: linear-gradient(120deg, var(--brand-800), var(--brand-600)); color: #fff;
+    padding: var(--s-4) var(--s-5); }
+  .ehd .e-head .t1 { font-size: var(--fs-s); font-weight: 700; letter-spacing: .04em; }
+  .ehd .e-head .t2 { font-size: var(--fs-micro); opacity: .8; margin-top: 2px; }
+  .ehd .e-list { padding: var(--s-3); display: flex; flex-direction: column; justify-content: space-between; gap: 9px; flex: 1; min-height: 0; }
+  .ehd .e-item { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--s-3);
+    padding: 10px 12px; border-radius: var(--r-sm); background: var(--surface-2);
+    border: 1px solid var(--divider-2); border-left: 3px solid var(--pass-solid); }
+  .ehd .e-po { font-family: var(--font-mono); font-weight: 700; font-size: 16px; color: var(--brand-ink); }
+  .ehd .e-date { font-size: var(--fs-micro); color: var(--ink-3); margin-top: 2px; }
+  .ehd .e-qty { font-family: var(--font-mono); font-weight: 700; font-size: 22px; color: var(--ink); text-align: right; }
+  .ehd .e-qty small { display: block; font-size: 9px; font-weight: 500; color: var(--ink-3); letter-spacing: .08em; }
+  .ehd .e-total { margin-top: auto; display: flex; justify-content: space-between; align-items: baseline;
+    padding: var(--s-4) var(--s-5); border-top: 2px solid var(--divider); background: var(--brand-tint);
+    font-size: var(--fs-label); font-weight: 700; color: var(--brand-ink); text-transform: uppercase; letter-spacing: .04em; }
+  .ehd .e-total .mono { font-family: var(--font-mono); font-size: 24px; }
+  .ehd .e-total small { font-size: 10px; color: var(--ink-3); letter-spacing: .08em; }
+
+  /* ── FOOTER ──────────────────────────────────────── */
+  .ftr { display: flex; justify-content: space-between; align-items: center;
+    font-size: var(--fs-label); color: var(--ink-2); padding: 2px var(--s-2); }
+  .ftr .l { display: flex; align-items: center; gap: var(--s-2); }
+  .ftr .r { font-weight: 600; color: var(--brand-ink); letter-spacing: .02em; }
+</style>
+</head>
+<body class="va">
+<div class="stage-wrap">
+<div class="stage" id="stage">
+<div class="stage-inner">
+
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="hdr-line">
+      <span class="lk">Line</span>
+      <span class="lv">U3-L1</span>
+      <span class="style">Style 324287 · 69 LĐ</span>
+    </div>
+    <div class="hdr-div"></div>
+    <div class="hdr-fields">
+      <div class="fld"><span class="k">Nhu cầu / Demand</span><span class="v demand mono">PL-26-324287-AW26-003</span></div>
+      <div class="fld"><span class="k">K.Hàng / Customer</span><span class="v">DESIPRO</span></div>
+      <div class="fld"><span class="k">Rải chuyền / First day</span><span class="v mono">29-5</span></div>
+      <div class="fld"><span class="k">Hàng tồn / WIP</span><span class="v mono">230</span></div>
+      <div class="fld"><span class="k">TPT (phút)</span><span class="v mono">667</span></div>
+      <div class="fld"><span class="k">Lao động / Workers</span><span class="v mono">69</span></div>
+    </div>
+    <div class="hdr-clock">
+      <span class="date">Thứ Hai · 02-6-2026</span>
+      <span class="time" id="clock">13:02</span>
+    </div>
+  </div>
+
+  <!-- BODY -->
+  <div class="body">
+    <div class="main">
+
+      <!-- KPI -->
+      <div class="kpi">
+        <!-- Hero progress -->
+        <div class="card hero">
+          <div class="h-top">
+            <span class="h-title">Tiến độ tổng</span>
+            <span class="h-en">Total progress</span>
+          </div>
+          <div class="h-mid">
+            <div class="pct-line">
+              <span class="pct c-fail">22.4%</span>
+              <span class="pct-tag fill-fail">CHƯA ĐẠT</span>
+            </div>
+            <div class="bar"><i style="width:22.4%; background:var(--fail-solid);"></i></div>
+          </div>
+          <div class="h-rows">
+            <div class="r"><div class="rk">Kế hoạch</div><div class="rv">2,140</div></div>
+            <div class="r"><div class="rk">Thực hiện</div><div class="rv">480</div></div>
+            <div class="r" style="margin-left:auto; text-align:right;"><div class="rk">Còn lại</div><div class="rv">1,660</div></div>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats">
+          <div class="card stat">
+            <div class="s-head"><div class="s-k">SL Ngày</div><div class="s-en">Day qty · QC passed</div></div>
+            <div class="s-mid"><span class="s-pct c-fail">33.3%</span><span class="pct-chip fill-fail">CHƯA ĐẠT</span></div>
+            <div class="s-sub"><div class="ss"><span class="ssk">KH</span><span class="ssv">240</span></div><div class="ss"><span class="ssk">TH</span><span class="ssv">80</span></div></div>
+          </div>
+
+          <div class="card stat">
+            <div class="s-head"><div class="s-k">Nhịp độ · Takt</div><div class="s-en">s/pc</div></div>
+            <div class="s-mid"><span class="s-pct c-fail">71.0%</span><span class="pct-chip fill-fail">CHƯA ĐẠT</span></div>
+            <div class="s-sub"><div class="ss"><span class="ssk">KH</span><span class="ssv">123</span></div><div class="ss"><span class="ssk">TT</span><span class="ssv">173</span></div></div>
+          </div>
+
+          <div class="card stat">
+            <div class="s-head"><div class="s-k">Hiệu suất OWE</div><div class="s-en">Working eff.</div></div>
+            <div class="s-mid"><span class="s-pct c-fail">52.5%</span><span class="pct-chip fill-fail">CHƯA ĐẠT</span></div>
+            <div class="s-sub"><div class="ss"><span class="ssk">Mục tiêu</span><span class="ssv">85%</span></div></div>
+          </div>
+
+          <div class="card stat">
+            <div class="s-head"><div class="s-k">Tỷ lệ lỗi</div><div class="s-en">Defect rate</div></div>
+            <div class="s-mid"><span class="s-pct c-pass">3.8%</span><span class="pct-chip fill-pass">ĐẠT</span></div>
+            <div class="s-sub"><div class="ss"><span class="ssk">Ngưỡng</span><span class="ssv">≤ 5%</span></div></div>
+          </div>
+
+          <div class="card stat endday">
+            <div class="s-head"><div class="s-k">Ngày kết thúc</div><div class="s-en">End day · MT → TT</div></div>
+            <div class="s-mid"><div class="ed-line"><span class="edv c-ink">09-6</span><span class="ed-arrow">→</span><span class="edv c-fail">10-6</span></div></div>
+            <div class="s-sub"><span class="pct-chip fill-fail">LỆCH +1 NGÀY</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HOURS -->
+      <div class="hours-sec">
+        <div class="sec-label">Tiến độ theo khung giờ · Hourly output</div>
+        <div class="hours">
+          <div class="hour">
+            <div class="h-time">9:30</div>
+            <div class="h-pair">
+              <div class="hc"><span class="hk">KH</span><span class="hv">54</span></div>
+              <div class="hc act is-fail"><span class="hk">TH</span><span class="hv">30</span></div>
+            </div>
+          </div>
+          <div class="hour">
+            <div class="h-time">11:30</div>
+            <div class="h-pair">
+              <div class="hc"><span class="hk">KH</span><span class="hv">58</span></div>
+              <div class="hc act is-fail"><span class="hk">TH</span><span class="hv">50</span></div>
+            </div>
+          </div>
+          <div class="hour">
+            <div class="h-time">14:30</div>
+            <div class="h-pair">
+              <div class="hc"><span class="hk">KH</span><span class="hv">58</span></div>
+              <div class="hc act is-empty"><span class="hk">TH</span><span class="hv">—</span></div>
+            </div>
+          </div>
+          <div class="hour">
+            <div class="h-time">16:30</div>
+            <div class="h-pair">
+              <div class="hc"><span class="hk">KH</span><span class="hv">54</span></div>
+              <div class="hc act is-empty"><span class="hk">TH</span><span class="hv">—</span></div>
+            </div>
+          </div>
+          <div class="hour">
+            <div class="h-time">Sau 16:30</div>
+            <div class="h-pair">
+              <div class="hc"><span class="hk">KH</span><span class="hv">16</span></div>
+              <div class="hc act is-empty"><span class="hk">TH</span><span class="hv">—</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ROOT CAUSE -->
+      <div class="rc">
+        <div class="rc-h">⚠ Nguyên nhân & Hành động khắc phục · Root cause & CAP</div>
+        <div class="rc-item">
+          <span class="rc-t">09:30</span>
+          <span><b>Nguyên nhân:</b> Chuyền chậm khởi động do thay cây cắt mới. &nbsp; <b>HĐKP:</b> Trưởng chuyền nhận cây cắt sớm 15′ trước ca.</span>
+        </div>
+        <div class="rc-item">
+          <span class="rc-t">11:30</span>
+          <span><b>Nguyên nhân:</b> Trạm Tra tay chính bị nghẽn (CN nghỉ đột xuất 1 người). &nbsp; <b>HĐKP:</b> Đã điều CN từ trạm Mí DK sang hỗ trợ.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- EHD -->
+    <div class="ehd">
+      <div class="e-head">
+        <div class="t1">EHD Information</div>
+        <div class="t2">Thông tin xuất hàng · Expected hand-over date</div>
+      </div>
+      <div class="e-list">
+        <div class="e-item"><div><div class="e-po">4524187771</div><div class="e-date">11-Jun-26</div></div><div class="e-qty">520<small>PCS</small></div></div>
+        <div class="e-item"><div><div class="e-po">4524196727</div><div class="e-date">11-Jun-26</div></div><div class="e-qty">370<small>PCS</small></div></div>
+        <div class="e-item"><div><div class="e-po">4524197701</div><div class="e-date">11-Jun-26</div></div><div class="e-qty">70<small>PCS</small></div></div>
+        <div class="e-item"><div><div class="e-po">4524144279</div><div class="e-date">15-Jun-26</div></div><div class="e-qty">30<small>PCS</small></div></div>
+        <div class="e-item"><div><div class="e-po">4524184618</div><div class="e-date">18-Jun-26</div></div><div class="e-qty">600<small>PCS</small></div></div>
+        <div class="e-item"><div><div class="e-po">4524193319</div><div class="e-date">18-Jun-26</div></div><div class="e-qty">440<small>PCS</small></div></div>
+        <div class="e-item"><div><div class="e-po">4524198597</div><div class="e-date">18-Jun-26</div></div><div class="e-qty">110<small>PCS</small></div></div>
+      </div>
+      <div class="e-total">
+        <span>Tổng đơn / Total</span>
+        <span class="mono">2,140 <small>PCS</small></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="ftr">
+    <span class="l"><span class="refresh-dot"></span>Cập nhật 13:02 · Tự làm mới mỗi 5 phút</span>
+    <span class="r">TV-1 · Theo dõi sản lượng & nhịp độ theo giờ</span>
+  </div>
+
+</div>
+</div>
+</div>
+
+<script>
+  function fit() {
+    const s = document.getElementById('stage');
+    s.style.transform = 'scale(' + Math.min(innerWidth/1920, innerHeight/1080) + ')';
+  }
+  fit(); addEventListener('resize', fit);
+  // live clock
+  function tick(){
+    const d = new Date();
+    const el = document.getElementById('clock');
+    if (el) el.textContent = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  }
+  tick(); setInterval(tick, 1000*15);
+</script>
+</body>
+</html>
