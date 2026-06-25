@@ -1,11 +1,13 @@
 # Hanging Conveyor Dashboard - Dev launcher
 # Usage: .\run.ps1            -> chay server tai http://127.0.0.1:8016
 #        .\run.ps1 -Setup     -> tao venv va cai requirements
-#        .\run.ps1 -Migrate   -> apply tat ca SQL migration trong app/migrations/ roi exit
+#        .\run.ps1 -CreateDb  -> smoke-test connect + CREATE hanging_app (khong migrate)
+#        .\run.ps1 -Migrate   -> ensure hanging_app + apply tat ca SQL migration
 #        .\run.ps1 -Reload    -> bat auto-reload khi can debug
 
 param(
     [switch]$Setup,
+    [switch]$CreateDb,
     [switch]$Migrate,
     [switch]$Reload,
     [string]$BindHost = "127.0.0.1",
@@ -33,6 +35,15 @@ if ($Setup -or -not (Test-Path $py)) {
     python -m venv .venv
     & $py -m pip install --upgrade pip
     & $py -m pip install -r requirements.txt
+}
+
+if ($CreateDb) {
+    Write-Host ">> Smoke-test + CREATE app database ..." -ForegroundColor Cyan
+    & $py "scripts/create_app_db.py"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Create app DB failed (exit $LASTEXITCODE)."
+    }
+    exit 0
 }
 
 if ($Migrate) {
