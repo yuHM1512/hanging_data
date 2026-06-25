@@ -83,6 +83,17 @@ def main() -> int:
     print(f"MES DB : {db.MES_DB}")
     print()
 
+    # Safety: REFUSE nếu app DB trùng MES DB — sẽ pollute schema `app.*` vào DB
+    # nguồn của hệ chuyền treo, đúng cái lỗi mà refactor này nhằm tránh.
+    if db.APP_DB.strip().lower() == db.MES_DB.strip().lower():
+        print(
+            f"ERROR: HANGING_APP_DB == HANGING_MES_DB ('{db.APP_DB}').\n"
+            f"App DB phải KHÁC MES DB để không ghi schema app.* vào database MES.\n"
+            f"Sửa .env: đặt HANGING_APP_DB thành tên khác (vd 'hanging_app').",
+            file=sys.stderr,
+        )
+        return 2
+
     print("[1/2] Ensure app database exists ...")
     try:
         ensure_app_db_exists()
