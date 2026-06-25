@@ -12,7 +12,8 @@ Tài liệu cho lần đầu tiên dựng app trên 1 máy mới (máy đã có 
 | Git for Windows | latest | https://git-scm.com/download/win |
 | SQL Server | 2014 (v12) trở lên | App tương thích từ v12 |
 | ODBC Driver | **17** for SQL Server | Tải riêng từ Microsoft |
-| Database `MSD` (hoặc tên khác) | đang có data MES chuyền treo | App kết nối, KHÔNG restore lại |
+| Database MES (vd `MSD`) | đang có data hệ chuyền treo | App **chỉ đọc**, KHÔNG ghi |
+| Database app (vd `hanging_app`) | riêng cho schema `app.*` | Migration runner tự tạo |
 
 ## 2. Clone & cấu hình
 
@@ -26,13 +27,16 @@ copy .env.example .env
 notepad .env
 ```
 
-Trong `.env` sửa 3 biến cho khớp môi trường:
+Trong `.env` sửa 4 biến cho khớp môi trường:
 
 ```ini
 HANGING_SQL_SERVER=.\SQLEXPRESS         # hoặc TENMAY\INSTANCE
-HANGING_SQL_DB=MSD                      # tên database thực tế
+HANGING_APP_DB=hanging_app              # DB riêng cho app, migration sẽ tự tạo
+HANGING_MES_DB=MSD                      # DB nguồn MES (đã tồn tại, read-only)
 HANGING_SQL_DRIVER=ODBC Driver 17 for SQL Server
 ```
+
+App kết nối mặc định vào `HANGING_APP_DB`, query data MES qua 3-part name `{MES_DB}.dbo.tXxx`. Việc tách 2 DB đảm bảo khi xí nghiệp restore `MSD` mới đè, schema `app.*` không bị mất.
 
 ## 3. Setup Python venv + dependencies
 
@@ -42,13 +46,16 @@ HANGING_SQL_DRIVER=ODBC Driver 17 for SQL Server
 
 Lệnh này tạo `.venv` và `pip install -r requirements.txt` (fastapi, uvicorn, pyodbc, jinja2, python-dotenv, openpyxl).
 
-## 4. Tạo schema `app` + seed data cứng
+## 4. Tạo DB app + schema + seed data cứng
 
 ```powershell
 .\run.ps1 -Migrate
 ```
 
-Apply tuần tự 7 file SQL trong `app/migrations/`:
+Migration runner làm 2 việc:
+
+1. `CREATE DATABASE hanging_app` (nếu chưa có) — collation tự khớp với MES DB để tránh cross-DB compare lỗi `collation conflict`
+2. Apply tuần tự 7 file SQL trong `app/migrations/`:
 
 | Migration | Tạo gì |
 |---|---|
@@ -96,15 +103,19 @@ Endpoint candidates lọc 2 điều kiện cứng:
 
 Đổi cutoff: sửa `PLAN_CANDIDATE_START_DATE` trong `app/admin.py`.
 
-## 8. Khi production data refresh (mới khôi phục)
+## 8. Khi production data refresh (MSD restore mới)
 
-Sau khi DB MES `MSD` được restore mới đè (data mới về), schema `app` sẽ mất (vì backup chỉ có schema `dbo`). Chỉ cần chạy lại migration:
+Vì schema `app.*` nằm trong DB **riêng** (`hanging_app`), việc restore `MSD` mới đè **KHÔNG** ảnh hưởng đến app data — toàn bộ demand/plan/cluster/holiday vẫn còn nguyên.
+
+Không cần làm gì sau khi MSD refresh. App sẽ tự đọc data mới qua cross-DB query.
+
+Nếu vì lý do nào đó cần tạo lại `hanging_app` (vd đổi tên DB hay xoá nhầm), chạy:
 
 ```powershell
 .\run.ps1 -Migrate
 ```
 
-Mọi seed cứng (curve, holiday, defect catalog, machine catalog, admin user) sẽ được tạo lại. Data operational (demand, plan, defect log…) phải nhập lại qua UI.
+Sẽ tự CREATE DATABASE + apply 7 migration. Lưu ý: data operational (demand, plan...) trong `hanging_app` cũ sẽ không khôi phục được nếu chưa backup.
 
 ## 9. Troubleshooting
 
@@ -112,6 +123,7 @@ Mọi seed cứng (curve, holiday, defect catalog, machine catalog, admin user) 
 |---|---|
 | `Invalid object name 'app.tUser'` khi login | Chưa migrate → chạy `.\run.ps1 -Migrate` |
 | `[ODBC Driver 17 for SQL Server]Login failed` | Sai server name trong `.env`, hoặc account Windows không có quyền trên SQL Server |
+| `Cannot resolve the collation conflict` | App DB tạo bằng tay với collation khác MES DB. Drop `hanging_app` rồi `.\run.ps1 -Migrate` để runner tạo lại với collation đúng |
 | Port 8016 bị chiếm | `run.ps1` tự kill process chiếm port; nếu vẫn lỗi → reboot Windows |
 | Excel không tách cột CSV xuất ra | Locale VN dùng `;`; script đã chuyển sang `.xlsx` |
 

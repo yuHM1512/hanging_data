@@ -299,18 +299,18 @@ def api_demand_delete(nhu_cau_me: str, user: dict = Depends(auth.require_admin))
 # ============================================================
 @router.get("/api/plan/candidates")
 def api_plan_candidates():
-    """List MONo từ dbo.tMOM chưa có trong tPlanMaster, kèm 2 điều kiện lọc.
+    """List MONo từ MES `tMOM` chưa có trong app.tPlanMaster, kèm 2 điều kiện lọc.
 
     1. MIN(ShtDate) trong tRecentWork >= PLAN_CANDIDATE_START_DATE
     2. Có sản lượng ra chuyền > 0 (SUM(Qty) WHERE StRole=13 AND IsLastSeq=1)
     """
     rows = db.query(
-        "SELECT mm.MONo FROM dbo.tMOM mm "
+        "SELECT mm.MONo FROM {MES_DB}.dbo.tMOM mm "
         "WHERE NOT EXISTS (SELECT 1 FROM app.tPlanMaster pm WHERE pm.MONo = mm.MONo) "
         "  AND mm.MONo IN ("
         "      SELECT rw.MONo "
-        "      FROM dbo.tRecentWork rw "
-        "      INNER JOIN dbo.tStation st ON rw.Station_guid = st.guid "
+        "      FROM {MES_DB}.dbo.tRecentWork rw "
+        "      INNER JOIN {MES_DB}.dbo.tStation st ON rw.Station_guid = st.guid "
         "      WHERE rw.MONo IS NOT NULL AND rw.MONo <> '' "
         "      GROUP BY rw.MONo "
         "      HAVING MIN(rw.ShtDate) >= ? "
@@ -509,11 +509,11 @@ _CLUSTER_GROUP_SQL = """
              MAX(CASE WHEN ds.IsCombine = 0 THEN ds.Odr END)
                OVER (ORDER BY ds.Odr ROWS UNBOUNDED PRECEDING) AS HeadOdr,
              rm.guid AS RouteM_guid
-      FROM dbo.tRouteDS ds
-      JOIN dbo.tRouteM rm ON ds.RouteM_guid = rm.guid
-      JOIN dbo.tMOM mm ON rm.MOM_guid = mm.guid
-      LEFT JOIN dbo.tMOSeqM sm ON sm.MOM_guid = mm.guid
-      LEFT JOIN dbo.tMOSeqD sd ON sd.MOSeqM_guid = sm.guid AND sd.SeqNo = ds.SeqNo
+      FROM {MES_DB}.dbo.tRouteDS ds
+      JOIN {MES_DB}.dbo.tRouteM rm ON ds.RouteM_guid = rm.guid
+      JOIN {MES_DB}.dbo.tMOM mm ON rm.MOM_guid = mm.guid
+      LEFT JOIN {MES_DB}.dbo.tMOSeqM sm ON sm.MOM_guid = mm.guid
+      LEFT JOIN {MES_DB}.dbo.tMOSeqD sd ON sd.MOSeqM_guid = sm.guid AND sd.SeqNo = ds.SeqNo
       WHERE mm.MONo = ?
     ),
     Groups AS (
@@ -534,8 +534,8 @@ _CLUSTER_GROUP_SQL = """
            ISNULL((
              SELECT STRING_AGG(CAST(st.StNo AS varchar(10)), ',')
                     WITHIN GROUP (ORDER BY st.StNo)
-             FROM dbo.tRouteDT dt
-             JOIN dbo.tStation st ON dt.Station_guid = st.guid
+             FROM {MES_DB}.dbo.tRouteDT dt
+             JOIN {MES_DB}.dbo.tStation st ON dt.Station_guid = st.guid
              WHERE dt.RouteM_guid = g.RouteM_guid
                AND dt.SeqNo IN (
                  SELECT SeqNo FROM Steps WHERE HeadOdr = g.HeadOdr

@@ -1,6 +1,6 @@
 # Hanging Conveyor Dashboard
 
-Web app trực quan hoá dữ liệu từ hệ chuyền treo MES (database `MSD` hoặc tương đương).
+Web app trực quan hoá dữ liệu từ hệ chuyền treo MES. Đọc data từ database MES (vd `MSD`) và lưu app data riêng trong `hanging_app` để không can thiệp DB nguồn.
 
 - **Backend**: FastAPI + pyodbc (SQL Server, Windows Auth)
 - **Frontend**: Jinja2 + vanilla JS + Chart.js
@@ -9,9 +9,9 @@ Web app trực quan hoá dữ liệu từ hệ chuyền treo MES (database `MSD`
 ## Quick start
 
 ```powershell
-copy .env.example .env       # sửa HANGING_SQL_DB, HANGING_SQL_SERVER
+copy .env.example .env       # sửa HANGING_MES_DB, HANGING_APP_DB, server
 .\run.ps1 -Setup             # tạo venv + cài deps
-.\run.ps1 -Migrate           # tạo schema app + seed data cứng
+.\run.ps1 -Migrate           # CREATE hanging_app + schema + seed
 .\run.ps1                    # chạy server tại http://127.0.0.1:8016
 ```
 
@@ -24,7 +24,8 @@ App chỉ chạy port **8016**. Đừng chạy bản sao trên port khác.
 | Biến | Mặc định | Ghi chú |
 |---|---|---|
 | `HANGING_SQL_SERVER` | `.\SQLEXPRESS` | Tên server / instance |
-| `HANGING_SQL_DB` | `MSD` | Tên database MES |
+| `HANGING_APP_DB` | `hanging_app` | DB riêng cho app, migration tự tạo |
+| `HANGING_MES_DB` | `MSD` | DB nguồn MES, app chỉ đọc |
 | `HANGING_SQL_DRIVER` | `ODBC Driver 17 for SQL Server` | Phải cài driver trước |
 
 ## API endpoints

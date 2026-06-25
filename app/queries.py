@@ -34,8 +34,8 @@ NORMALIZED_WORK_CTE = """
             CASE
                 WHEN CHARINDEX('#', rw.MONo) > 0 THEN SUBSTRING(rw.MONo, CHARINDEX('#', rw.MONo), 200)
             END AS plan_key
-        FROM tRecentWork rw
-        INNER JOIN tStation st ON rw.Station_guid = st.guid
+        FROM {MES_DB}.dbo.tRecentWork rw
+        INNER JOIN {MES_DB}.dbo.tStation st ON rw.Station_guid = st.guid
         OUTER APPLY (
             SELECT CASE
                 WHEN PATINDEX('%LINE%', UPPER(rw.MONo)) > 0

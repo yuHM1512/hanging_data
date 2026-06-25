@@ -41,8 +41,8 @@ def _defect_total_kcs(plan_guid: str, sht_date: date) -> int:
     rows = db.query(
         """
         SELECT ISNULL(SUM(rw.DefectiveQty), 0) AS Q
-        FROM dbo.tRecentWork rw
-        INNER JOIN dbo.tStation st ON rw.Station_guid = st.guid
+        FROM {MES_DB}.dbo.tRecentWork rw
+        INNER JOIN {MES_DB}.dbo.tStation st ON rw.Station_guid = st.guid
         INNER JOIN app.tPlanMaster pm ON pm.PlanMaster_guid = ?
         WHERE st.StRole = 13 AND rw.IsLastSeq = 1
           AND rw.MONo = pm.MONo AND rw.ShtDate = ?
@@ -108,11 +108,11 @@ def api_stations(
                  MAX(CASE WHEN ds.IsCombine = 0 THEN ds.Odr END)
                    OVER (ORDER BY ds.Odr ROWS UNBOUNDED PRECEDING) AS HeadOdr,
                  rm.guid AS RouteM_guid
-          FROM dbo.tRouteDS ds
-          JOIN dbo.tRouteM rm ON ds.RouteM_guid = rm.guid
-          JOIN dbo.tMOM mm ON rm.MOM_guid = mm.guid
-          LEFT JOIN dbo.tMOSeqM sm ON sm.MOM_guid = mm.guid
-          LEFT JOIN dbo.tMOSeqD sd ON sd.MOSeqM_guid = sm.guid AND sd.SeqNo = ds.SeqNo
+          FROM {MES_DB}.dbo.tRouteDS ds
+          JOIN {MES_DB}.dbo.tRouteM rm ON ds.RouteM_guid = rm.guid
+          JOIN {MES_DB}.dbo.tMOM mm ON rm.MOM_guid = mm.guid
+          LEFT JOIN {MES_DB}.dbo.tMOSeqM sm ON sm.MOM_guid = mm.guid
+          LEFT JOIN {MES_DB}.dbo.tMOSeqD sd ON sd.MOSeqM_guid = sm.guid AND sd.SeqNo = ds.SeqNo
           WHERE mm.MONo = ?
         ),
         Groups AS (

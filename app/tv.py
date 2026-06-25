@@ -123,9 +123,9 @@ def api_tv_plans():
                CONVERT(varchar(10), pm.FirstHangDate, 120) AS FirstHangDate,
                (SELECT COUNT(*) FROM app.tClusterStationConfig c
                 WHERE c.NhuCauMe = pm.NhuCauMe) AS ClusterCount,
-               CONVERT(varchar(10), (SELECT MIN(ShtDate) FROM dbo.tRecentWork
+               CONVERT(varchar(10), (SELECT MIN(ShtDate) FROM {MES_DB}.dbo.tRecentWork
                                      WHERE MONo = pm.MONo), 120) AS DataFrom,
-               CONVERT(varchar(10), (SELECT MAX(ShtDate) FROM dbo.tRecentWork
+               CONVERT(varchar(10), (SELECT MAX(ShtDate) FROM {MES_DB}.dbo.tRecentWork
                                      WHERE MONo = pm.MONo), 120) AS DataTo
         FROM app.tPlanMaster pm
         WHERE pm.NhuCauMe IS NOT NULL
@@ -200,14 +200,14 @@ def _resolve_route_step_to_station_guids(
                  MAX(CASE WHEN ds.IsCombine = 0 THEN ds.Odr END)
                    OVER (ORDER BY ds.Odr ROWS UNBOUNDED PRECEDING) AS HeadOdr,
                  rm.guid AS RouteM_guid
-          FROM dbo.tRouteDS ds
-          JOIN dbo.tRouteM rm ON ds.RouteM_guid = rm.guid
-          JOIN dbo.tMOM mm ON rm.MOM_guid = mm.guid
+          FROM {MES_DB}.dbo.tRouteDS ds
+          JOIN {MES_DB}.dbo.tRouteM rm ON ds.RouteM_guid = rm.guid
+          JOIN {MES_DB}.dbo.tMOM mm ON rm.MOM_guid = mm.guid
           WHERE mm.MONo = ?
         )
         SELECT DISTINCT CAST(dt.Station_guid AS varchar(50)) AS Station_guid
         FROM Steps s
-        JOIN dbo.tRouteDT dt ON dt.RouteM_guid = s.RouteM_guid AND dt.SeqNo = s.SeqNo
+        JOIN {MES_DB}.dbo.tRouteDT dt ON dt.RouteM_guid = s.RouteM_guid AND dt.SeqNo = s.SeqNo
         WHERE s.HeadOdr = ?
         """,
         (mono, route_step_odr),
@@ -232,9 +232,9 @@ def _scan_count_for_cluster(
           SELECT ds.Odr, ds.SeqNo,
                  MAX(CASE WHEN ds.IsCombine = 0 THEN ds.Odr END)
                    OVER (ORDER BY ds.Odr ROWS UNBOUNDED PRECEDING) AS HeadOdr
-          FROM dbo.tRouteDS ds
-          JOIN dbo.tRouteM rm ON ds.RouteM_guid = rm.guid
-          JOIN dbo.tMOM mm ON rm.MOM_guid = mm.guid
+          FROM {MES_DB}.dbo.tRouteDS ds
+          JOIN {MES_DB}.dbo.tRouteM rm ON ds.RouteM_guid = rm.guid
+          JOIN {MES_DB}.dbo.tMOM mm ON rm.MOM_guid = mm.guid
           WHERE mm.MONo = ?
         )
         SELECT DISTINCT SeqNo FROM Steps WHERE HeadOdr = ?
@@ -260,7 +260,7 @@ def _scan_count_for_cluster(
     # An toàn: dùng MAX per SeqNo rồi MIN (vì SP qua hết các seq)
     sql = f"""
         SELECT SeqNo, COUNT(*) AS Qty
-        FROM dbo.tRecentWork rw
+        FROM {MES_DB}.dbo.tRecentWork rw
         WHERE rw.MONo = ? AND rw.SeqNo IN ({placeholders}) {where_date}
         GROUP BY SeqNo
     """
@@ -282,8 +282,8 @@ def _hourly_actual(mono: str, the_date: date) -> dict[int, int]:
     rows = db.query(
         """
         SELECT rw.BeginTime, rw.Qty
-        FROM dbo.tRecentWork rw
-        INNER JOIN dbo.tStation st ON rw.Station_guid = st.guid
+        FROM {MES_DB}.dbo.tRecentWork rw
+        INNER JOIN {MES_DB}.dbo.tStation st ON rw.Station_guid = st.guid
         WHERE st.StRole = 13 AND rw.IsLastSeq = 1
           AND rw.MONo = ? AND rw.ShtDate = ?
         """,
@@ -347,8 +347,8 @@ def _kcs_defective_hourly(mono: str, the_date: date) -> dict[int, int]:
     rows = db.query(
         """
         SELECT rw.BeginTime, rw.DefectiveQty
-        FROM dbo.tRecentWork rw
-        INNER JOIN dbo.tStation st ON rw.Station_guid = st.guid
+        FROM {MES_DB}.dbo.tRecentWork rw
+        INNER JOIN {MES_DB}.dbo.tStation st ON rw.Station_guid = st.guid
         WHERE st.StRole = 13 AND rw.IsLastSeq = 1
           AND rw.MONo = ? AND rw.ShtDate = ?
           AND rw.DefectiveQty > 0
@@ -404,8 +404,8 @@ def _output_kcs(mono: str, from_date: Optional[date], to_date: date) -> dict:
         f"""
         SELECT ISNULL(SUM(rw.Qty), 0) AS Qty,
                ISNULL(SUM(rw.DefectiveQty), 0) AS DefQty
-        FROM dbo.tRecentWork rw
-        INNER JOIN dbo.tStation st ON rw.Station_guid = st.guid
+        FROM {MES_DB}.dbo.tRecentWork rw
+        INNER JOIN {MES_DB}.dbo.tStation st ON rw.Station_guid = st.guid
         WHERE {where}
         """,
         params,
@@ -432,7 +432,7 @@ def _workers_count(
     if ld_bien_che:
         return int(ld_bien_che)
     rows = db.query(
-        "SELECT COUNT(DISTINCT EmpID) AS N FROM dbo.tRecentWork "
+        "SELECT COUNT(DISTINCT EmpID) AS N FROM {MES_DB}.dbo.tRecentWork "
         "WHERE MONo = ? AND ShtDate = ?",
         (mono, the_date),
     )
@@ -763,8 +763,8 @@ def api_tv3(
     recent_scan_row = db.query(
         """
         SELECT MAX(rw.BeginTime) AS BT
-        FROM dbo.tRecentWork rw
-        INNER JOIN dbo.tStation st ON rw.Station_guid = st.guid
+        FROM {MES_DB}.dbo.tRecentWork rw
+        INNER JOIN {MES_DB}.dbo.tStation st ON rw.Station_guid = st.guid
         WHERE st.StRole = 13 AND rw.IsLastSeq = 1
           AND rw.MONo = ? AND rw.ShtDate = ?
         """,
@@ -931,8 +931,8 @@ def _kcs_qty_for_me(nhu_cau_me_id: str, from_date: date, to_date: date) -> int:
     rows = db.query(
         f"""
         SELECT ISNULL(SUM(rw.Qty), 0) AS Q
-        FROM dbo.tRecentWork rw
-        INNER JOIN dbo.tStation st ON rw.Station_guid = st.guid
+        FROM {MES_DB}.dbo.tRecentWork rw
+        INNER JOIN {MES_DB}.dbo.tStation st ON rw.Station_guid = st.guid
         WHERE st.StRole = 13 AND rw.IsLastSeq = 1
           AND rw.MONo IN ({placeholders})
           AND rw.ShtDate BETWEEN ? AND ?
@@ -974,7 +974,7 @@ def _workers_for_me_day(
     mono_list = [r["MONo"] for r in monos]
     placeholders = ",".join(["?"] * len(mono_list))
     rows = db.query(
-        f"SELECT COUNT(DISTINCT EmpID) AS N FROM dbo.tRecentWork "
+        f"SELECT COUNT(DISTINCT EmpID) AS N FROM {MES_DB}.dbo.tRecentWork "
         f"WHERE MONo IN ({placeholders}) AND ShtDate = ?",
         mono_list + [the_date],
     )
@@ -1018,8 +1018,8 @@ def api_tv4(
         ph = ",".join(["?"] * len(mono_list))
         r = db.query(
             f"""SELECT MAX(rw.ShtDate) AS D
-                FROM dbo.tRecentWork rw
-                INNER JOIN dbo.tStation st ON rw.Station_guid = st.guid
+                FROM {MES_DB}.dbo.tRecentWork rw
+                INNER JOIN {MES_DB}.dbo.tStation st ON rw.Station_guid = st.guid
                 WHERE st.StRole = 13 AND rw.IsLastSeq = 1
                   AND rw.MONo IN ({ph})""",
             mono_list,
